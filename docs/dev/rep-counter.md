@@ -49,6 +49,13 @@ Notes from the upstream docs:
     ids and the App Group to our own. HealthKit and App Groups are expected to work on a free
     team but are not verified yet.
 
+- 2026-11-09: GitHub Actions in the fork. Keep `test.yml` and `ios.yml` (ios.yml runs WatchCore
+  `swift test` and builds the watch app). Disable in the GitHub UI (no file change):
+  `docker-publish.yml`, `pages.yml`, `cla.yml`, `cla-issue.yml`, `audit.yml`. Ignore `mirror.yml`
+  (guarded to upstream) and `release-check.yml` (only on `v*` tags). Turn off Dependabot, close
+  its 10 PRs, and delete the `opengym-api` / `opengym-web` images that the first push to `main`
+  published to ghcr.io.
+
 ## Open questions
 
 - Apple Watch / iPhone model and watchOS / iOS versions?
