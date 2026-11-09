@@ -5,7 +5,9 @@ Read this file first at the start of every session; update it before the session
 
 ## Current phase
 
-**Phase 0: environment check** (in progress)
+**Phase 1: build unmodified openGym on iPhone + Watch** (plan written, waiting for approval)
+
+Phase 0 (environment check) done 2026-11-09.
 
 ## Repo setup
 
@@ -39,6 +41,7 @@ Notes from the upstream docs:
 
 ## Decisions
 
+- 2026-11-09: the deleted files in the old `MyGym` (maxgym) folder were deleted on purpose by the user.
 - 2026-11-09: bring openGym in by clone + push into the empty `mygym` repo (not a GitHub fork).
 - 2026-11-09: signing uses a **free Apple ID** (Xcode Personal Team). Consequences:
   - The provisioning profile expires after 7 days: re-run from Xcode at least weekly, especially
@@ -56,10 +59,14 @@ Notes from the upstream docs:
   its 10 PRs, and delete the `opengym-api` / `opengym-web` images that the first push to `main`
   published to ghcr.io.
 
+## Devices
+
+- iPhone 15 Pro, latest iOS (exact version not checked yet).
+- Apple Watch Series 10, 45 mm (watchOS version not checked yet; openGym needs watchOS 10+).
+
 ## Open questions
 
-- Apple Watch / iPhone model and watchOS / iOS versions?
-- Were the deleted files in the old `MyGym` (maxgym) folder deleted on purpose?
+- First exercise to count (needed in Phase 2).
 
 ## Upstream files changed
 
