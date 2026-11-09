@@ -5,7 +5,7 @@ Read this file first at the start of every session; update it before the session
 
 ## Current phase
 
-**Phase 1: build unmodified openGym on iPhone + Watch** (plan written, waiting for approval)
+**Phase 1: build unmodified openGym on iPhone + Watch** (simulator build OK 2026-11-09, waiting for the user's device test)
 
 Phase 0 (environment check) done 2026-11-09.
 
@@ -70,8 +70,50 @@ Notes from the upstream docs:
 
 ## Upstream files changed
 
-None yet.
+Phase 1 (commit "build: use own bundle ids and app group"):
+- Bundle ids `ch.opengym.app` -> `com.rippuhonwan.mygym` (`App.xcodeproj/project.pbxproj`,
+  `ci/add-watch-app.rb`, `WKCompanionAppBundleIdentifier` in `Watch/Info.plist`,
+  `.github/workflows/ios.yml`).
+- App Group `group.ch.opengym.app` -> `group.com.rippuhonwan.mygym` in every entitlements file,
+  `App/Info.plist`, `AnimationPacksDownloader/Info.plist`, `WorkoutActivity.swift`,
+  `Watch/WidgetState.swift`.
+- `App/App.entitlements`: removed Associated Domains and NFC (not available on a free team).
+- Not changed: `scripts/ios/finish-ipa.sh` (release only), keychain fallback strings, URL names.
 
-## How to test
+## How to build (every fresh clone or after `npm ci`)
 
-Nothing to test yet.
+The watch target is not committed in the Xcode project; the upstream script adds it.
+
+```bash
+cd ~/dev/mygym/frontend
+npm ci
+LANG=en_US.UTF-8 npm run build:mobile   # vite build + cap sync + pod install
+cd ios
+GEM_HOME=/opt/homebrew/opt/cocoapods/libexec ruby ci/add-watch-app.rb
+open App/App.xcworkspace                # the .xcworkspace, not the .xcodeproj
+```
+
+- `pod install` may fail with `curl: (56) ... 504` on a GitHub release zip. That is GitHub,
+  not us: wait a minute and run `pod install` in `frontend/ios/App` again.
+- After these steps git shows changes in `project.pbxproj`, `Podfile`, two Android gradle files
+  and some untracked files. They are generated: do not commit them.
+
+## How to test (Phase 1, on the devices)
+
+1. iPhone: Settings > Privacy & Security > Developer Mode > On (restarts the phone).
+2. Connect the iPhone by cable, unlock it, tap Trust.
+3. Watch: keep it paired and on the wrist, unlocked, iPhone and Mac on the same Wi-Fi.
+   In Xcode open Window > Devices and Simulators and wait until the watch appears
+   (can take several minutes the first time). Then on the watch: Settings > Privacy & Security >
+   Developer Mode > On.
+4. Xcode > Settings > Accounts: add your Apple ID.
+5. In Xcode select the project `App`, then for each target `App`, `OpenGymWatch`,
+   `OpenGymWatchWidgets`: Signing & Capabilities > Team = your Personal Team.
+   Note any red error text and send it to Claude.
+6. Scheme `App`, destination your iPhone, press Run. On the iPhone: Settings > General >
+   VPN & Device Management > trust your developer app.
+7. Scheme `OpenGymWatch`, destination your watch, press Run.
+8. Check: the iPhone app opens; start a workout with one exercise; the watch shows it;
+   tick one set on the watch and see it on the phone.
+
+Report back: which steps worked, the exact error text and a screenshot for any that did not.
