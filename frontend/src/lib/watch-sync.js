@@ -139,6 +139,8 @@ function watchEntry (stored, H, S) {
     // the step the weight moves in, as on the phone (this exercise's own, else its plates' default)
     ...(mode === 'reps' && stepOf(cfg, V) ? { step: stepOf(cfg, V) } : {}),
     ...(own ? { unit: own } : {}),
+    // the catalogue's body part: the watch records motion only for exercises that move the wrist
+    ...(ex && ex.bp ? { bodyPart: ex.bp } : {}),
   }
 }
 

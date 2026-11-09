@@ -79,6 +79,9 @@ struct Entry: Codable, Equatable {
     /// Its own weight unit, "kg" or "lb", when it is not the workout's (#657): its weights, last
     /// time, best and step are in it, and so is what the watch sends back. None: the workout's.
     var unit: String?
+    /// The catalogue's body part ("upper arms", "upper legs", ...); none for a custom exercise.
+    /// Decides whether the watch records motion for its sets (MotionLog.records).
+    var bodyPart: String?
 
     var isTimed: Bool { mode == "time" }
     var isCardio: Bool { mode == "cardio" }

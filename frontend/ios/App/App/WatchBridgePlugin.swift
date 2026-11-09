@@ -308,6 +308,19 @@ public class WatchBridgePlugin: CAPPlugin, CAPBridgedPlugin, WCSessionDelegate {
         DispatchQueue.main.async { self.notifyListeners("watchEvent", data: event) }
     }
 
+    /// A set's motion CSV from the watch (Watch/MotionRecorder.swift), for the rep counter. Moved
+    /// before this returns: WatchConnectivity deletes the received file right after. It lands in
+    /// Documents/motion, which the Files app shows (Info.plist UIFileSharingEnabled).
+    public func session(_ session: WCSession, didReceive file: WCSessionFile) {
+        guard let name = file.metadata?["motion"] as? String else { return }
+        let fm = FileManager.default
+        let dir = fm.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("motion", isDirectory: true)
+        try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
+        let to = dir.appendingPathComponent((name as NSString).lastPathComponent)
+        try? fm.removeItem(at: to)      // the same set sent again: the newer copy wins
+        try? fm.moveItem(at: file.fileURL, to: to)
+    }
+
     /// The page asked for the status before the session was up (right after launch): it is told now.
     public func session(_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState, error: Error?) {
         DispatchQueue.main.async { self.notifyListeners("watchState", data: ["activated": activationState == .activated]) }

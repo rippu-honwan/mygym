@@ -18,6 +18,8 @@ import HealthKit
  */
 final class WorkoutManager: NSObject, ObservableObject, HKWorkoutSessionDelegate, HKLiveWorkoutBuilderDelegate {
     static let enabledKey = "healthEnabled"
+    /// Motion for the rep counter, running exactly while the workout does (MotionRecorder.swift).
+    let motion = MotionRecorder()
 
     @Published var enabled: Bool = UserDefaults.standard.bool(forKey: WorkoutManager.enabledKey) {
         didSet { UserDefaults.standard.set(enabled, forKey: WorkoutManager.enabledKey) }
@@ -121,6 +123,7 @@ final class WorkoutManager: NSObject, ObservableObject, HKWorkoutSessionDelegate
     /// running keeps its type.
     func start(workoutId wid: String? = nil, type: String? = nil, opened: HKWorkoutActivityType? = nil) {
         wanted = true
+        motion.start()
         if let wid = wid { workoutId = wid }
         // Already running (opened by the phone before its workout arrived): only the id to add.
         if session != nil && !prepared { tag(); return }
@@ -170,12 +173,14 @@ final class WorkoutManager: NSObject, ObservableObject, HKWorkoutSessionDelegate
         guard let s = session, !paused, s.state == .running else { return }
         paused = true
         s.pause()
+        motion.stop()
     }
 
     func resume() {
         guard paused else { return }
         paused = false
         session?.resume()
+        motion.start()
     }
 
     /// The app was killed (or crashed) with a workout session running: watchOS kept the session and
@@ -295,6 +300,7 @@ final class WorkoutManager: NSObject, ObservableObject, HKWorkoutSessionDelegate
     /// (a workout left running ends at its last set, not when the watch noticed), else now.
     func end(save: Bool, at: Date? = nil, totals: ((Totals) -> Void)? = nil) {
         wanted = false
+        motion.stop()
         workoutId = nil
         prepared = false
         if let q = query { store.stop(q); query = nil }

@@ -48,6 +48,16 @@ describe('the snapshot', () => {
     const S = state({ workouts: [{ id: 'old', d: '2026-10-01', entries: [{ id: '0025', target: { sets: 2, reps: 8 }, sets: [{ w: 55, r: 8, done: true }, { w: 55, r: 7, done: true }] }] }] })
     expect(buildSnapshot(S).active.entries[0].last).toMatch(/55/)
   })
+
+  it('carries the catalogue body part, which decides the watch motion recording', () => {
+    const S = state()
+    S.active.entries.push({ id: '0043', target: { sets: 1, reps: 5 }, sets: [{ w: 80, r: 5, done: false }] })
+    S.active.entries.push({ id: 'custom-1', name: 'My move', target: { sets: 1, reps: 5 }, sets: [{ w: 0, r: 5, done: false }] })
+    const [bench, , squat, custom] = buildSnapshot(S).active.entries
+    expect(bench.bodyPart).toBe('chest')
+    expect(squat.bodyPart).toBe('upper legs')
+    expect(custom).not.toHaveProperty('bodyPart')
+  })
 })
 
 describe('the events from the watch', () => {

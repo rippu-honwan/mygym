@@ -99,12 +99,13 @@ export function garminSnapshot (snap, { max = GARMIN_MAX_BYTES } = {}) {
     const win = garminWindow(A)
     const { progress, volume } = garminTotals(A)
     const { entries, ...rest } = A
-    out.active = { ...rest, count: entries.length, progress, volume, entries: win.map(i => ({ ...entries[i], i })) }
+    // bodyPart is for the Apple Watch motion recording only: not worth the Garmin's memory
+    out.active = { ...rest, count: entries.length, progress, volume, entries: win.map(i => ({ ...slim(entries[i], 'bodyPart'), i })) }
   }
   const R = snap?.ready
   if (R) {
     out.ready = {
-      today: R.today ? { ...R.today, entries: (R.today.entries || []).map(e => slim(e, 'last', 'best')) } : null,
+      today: R.today ? { ...R.today, entries: (R.today.entries || []).map(e => slim(e, 'last', 'best', 'bodyPart')) } : null,
       others: (R.others || []).slice(0, GARMIN_OTHERS_MAX).map(nameOnly),
     }
   }

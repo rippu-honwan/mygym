@@ -441,6 +441,15 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
         // Sent first, saved second: killed in between, the phone still has the tick (and the next
         // snapshot brings it back here); the other way round the tick would be lost on the phone.
         if let event = event { send(event: event) }
+        if !isDemo {
+            // The set's motion, from its start to this tick, for the rep counter (MotionRecorder).
+            var meta: [String: Any] = [:]
+            if let tr = tr { meta["reps"] = tr }
+            if let tw = tw { meta["w"] = tw }
+            if let wid = w.id { meta["wid"] = wid }
+            if let id = event?["id"] { meta["id"] = id }
+            health.motion.send(entry: e, set: si, from: setFrom, to: now, meta: meta)
+        }
         state = next
         setStartedAt = now
         picked[ei] = nil
@@ -986,6 +995,10 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
             if tries < 3 { DispatchQueue.main.asyncAfter(deadline: .now() + 5) { self.transfer(json, tries: tries + 1) } }
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { self.updateLink() }
+    }
+
+    func session(_ session: WCSession, didFinish fileTransfer: WCSessionFileTransfer, error: Error?) {
+        MotionRecorder.finished(fileTransfer, error: error)
     }
 
     /* ---------- the animations ---------- */

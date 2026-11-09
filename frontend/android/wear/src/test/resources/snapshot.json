@@ -41,7 +41,8 @@
           "w": 57.5,
           "r": 6
         },
-        "step": 2.5
+        "step": 2.5,
+        "bodyPart": "chest"
       },
       {
         "id": "0001",
@@ -66,7 +67,8 @@
           }
         ],
         "bodyweight": true,
-        "step": 2.5
+        "step": 2.5,
+        "bodyPart": "waist"
       }
     ],
     "healthType": "strength_training",
