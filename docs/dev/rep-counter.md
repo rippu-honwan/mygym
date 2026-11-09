@@ -87,9 +87,25 @@ Notes from the upstream docs:
 - Apple Watch: the user said Series 10 45 mm; Xcode reports Apple Watch Series 9 (Watch7,2).
   watchOS 27.0.1, Developer Mode on.
 
+## Phase 2a plan (approved 2026-11-09)
+
+Decisions: first exercise biceps curl (the user's routine: 0031 barbell curl, 0313 dumbbell hammer
+curl). Record every exercise that moves the wrist: skip catalogue `bodyPart` "upper legs" /
+"lower legs"; unknown (custom) exercises are recorded. 50 Hz. Phase 2 split into 2a (watch ->
+iPhone, CSV visible in the Files app) and 2b (iPhone -> Mac server `data/motion/`).
+
+- `WatchCore/MotionLog.swift`: record rule, slice of a time window, CSV encoder; `swift test`.
+- `Watch/MotionRecorder.swift`: CMMotionManager deviceMotion at 50 Hz while a workout runs,
+  last 5 minutes kept. `SessionStore.completeSet` slices set start -> tick, writes the CSV and
+  sends it with `WCSession.transferFile`.
+- `bodyPart` added to the watch entry (`Model.swift`, `frontend/src/lib/watch-sync.js`).
+- iPhone: `WatchBridgePlugin` stores received files in `Documents/motion/`; `Info.plist`
+  `UIFileSharingEnabled` + `LSSupportsOpeningDocumentsInPlace` so the Files app shows them.
+- CSV: line 1 `# {json metadata}`, then `t,ax,ay,az,rx,ry,rz,gx,gy,gz` (s, g, rad/s, g).
+
 ## Open questions
 
-- First exercise to count (needed before Phase 2 starts).
+- None right now.
 
 ## Upstream files changed
 
