@@ -26,8 +26,8 @@ paired with one app, so switch to MyGym once it is stable.
 ## Current phase
 
 **Phase 1**: MyGym runs on the real iPhone (2026-11-09); watch app not installed yet (Xcode
-does not see the watch). **Phase 1b**: iPhone paired with the Mac server 2026-11-09; no state
-file until the phone has data.
+does not see the watch). **Phase 1b** done 2026-11-09: iPhone paired, routines synced to
+`data/state-<uid>.json`, MCP `list_routines` returns them.
 
 Phase 0 (environment check) done 2026-11-09.
 
@@ -154,6 +154,10 @@ Claude: MCP server `opengym` registered with `claude mcp add --scope local` for
 Status 2026-11-09: step 1 done (profile `me`, admin; created with "Create new profile", not
 "Sign in with passkey"). MCP serves that profile and lists 11 tools; they answer "no synced state
 yet" until a device saves data (`data/state-<uid>.json` appears then).
+
+2026-11-09: end-to-end check passed. Pairing at 23:07, but the first upload (`PUT /api/data` 200)
+only came at 23:20 when MyGym was open in the foreground. Sync needs the app open on the phone
+(and the Mac awake, same Wi-Fi).
 
 ## Real device notes (2026-11-09)
 
