@@ -3,6 +3,26 @@
 Fork of openGym that adds automatic rep counting on the Apple Watch (CoreMotion).
 Read this file first at the start of every session; update it before the session ends.
 
+## Goal (the user, 2026-11-09)
+
+1. iPhone and Apple Watch both record workouts (openGym already does this).
+2. The watch counts reps automatically for chosen exercises from the motion data (new).
+3. Data is stored as files on the user's Mac, which runs the openGym server (self-hosted `data/`).
+4. Claude on the Mac reads that data for analysis (openGym's `mcp/` server, or the files).
+
+## Phases
+
+1. Phase 1: build our app (MyGym) on the real iPhone and Watch.
+2. Phase 1b: self-hosted server on the Mac (Colima + Docker, home Wi-Fi first, Tailscale later
+   if needed), pair MyGym with it, register `mcp/` with Claude Code.
+3. Phase 2: the watch records motion data per set, sent via the iPhone to the server as files.
+4. Phase 3: collect data for 2-3 weeks.
+5. Phase 4: find the rep-counting algorithm in Python, port it to `WatchCore` with tests.
+6. Phase 5: live rep count on the watch, auto-filled reps, synced as normal sets.
+
+The user may keep the App Store openGym for daily logging while testing; one account should only be
+paired with one app, so switch to MyGym once it is stable.
+
 ## Current phase
 
 **Phase 1: build unmodified openGym on iPhone + Watch** (simulator build OK 2026-11-09, waiting for the user's device test)
