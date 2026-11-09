@@ -142,6 +142,24 @@ open App/App.xcworkspace                # the .xcworkspace, not the .xcodeproj
 - After these steps git shows changes in `project.pbxproj`, `Podfile`, two Android gradle files
   and some untracked files. They are generated: do not commit them.
 
+## Phase 2a status (2026-11-09)
+
+Code committed ("feat: record watch motion per set"); WatchCore 73 tests and frontend
+watch-sync/garmin tests pass; signed builds installed on the iPhone and the watch. Not yet
+verified on a real workout.
+
+### The user's test
+
+1. Watch: MyGym settings > Apple Health must be ON (the workout session keeps the app and the
+   motion sensor running with the wrist down).
+2. Start Upper A (has 0031 barbell curl) on the iPhone or the watch. Do 2 sets of barbell curl
+   and 1 set of any leg exercise, ticking each set ON THE WATCH with the real rep count.
+3. Finish the workout, open MyGym on the iPhone and keep it open for ~30 s.
+4. Tell Claude. Claude copies the CSVs to the Mac:
+   `xcrun devicectl device copy from --device <iPhone UDID> --domain-type appDataContainer
+   --domain-identifier com.rippuhonwan.mygym --source Documents/motion --destination data/motion-phone`
+   and checks: curl sets present, leg set absent, ~50 rows/s, reps visible in a plot.
+
 ## Server on the Mac (Phase 1b)
 
 Set up 2026-11-09: Colima 0.10.3, Docker 29.9, docker compose 5.7 (Homebrew). Upstream images
