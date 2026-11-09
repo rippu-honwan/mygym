@@ -13,7 +13,7 @@
 require 'xcodeproj'
 
 NAME = 'OpenGymWatch'
-BUNDLE_ID = 'ch.opengym.app.watchkitapp'
+BUNDLE_ID = 'com.rippuhonwan.mygym.watchkitapp'
 DIR = 'Watch'
 
 dir = File.expand_path('../App', __dir__)
