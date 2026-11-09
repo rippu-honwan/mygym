@@ -22,7 +22,8 @@ Read this file first at the start of every session; update it before the session
 |---|---|---|
 | Xcode | 27.1 | 26 (newer, not yet built) |
 | Node | 22.18.0 | 22 |
-| CocoaPods | not installed | needed (`brew install cocoapods`) |
+| CocoaPods | 1.17.0 (Homebrew, 2026-11-09) | needed |
+| Ruby | 4.0.9 (Homebrew, pulled in by CocoaPods) | - |
 | Homebrew | 7.0.10 | - |
 
 Notes from the upstream docs:
@@ -31,6 +32,10 @@ Notes from the upstream docs:
 - `WatchCore` (Swift package, `swift test`) holds the watch logic and tests.
 - App Group `group.ch.opengym.app` and bundle ids `ch.opengym.app*` belong to upstream and must be
   renamed for our signing.
+- `require 'xcodeproj'` fails with plain `ruby`: the gem lives inside the CocoaPods keg. Run the
+  watch script with `GEM_HOME=/opt/homebrew/opt/cocoapods/libexec ruby frontend/ios/ci/add-watch-app.rb`.
+- `pod` needs a UTF-8 locale; `~/.zshrc` already sets `LANG=en_US.UTF-8`, so this only matters in
+  non-interactive shells.
 
 ## Decisions
 
@@ -47,7 +52,7 @@ Notes from the upstream docs:
 ## Open questions
 
 - Apple Watch / iPhone model and watchOS / iOS versions?
-- OK to install CocoaPods with Homebrew?
+- Were the deleted files in the old `MyGym` (maxgym) folder deleted on purpose?
 
 ## Upstream files changed
 
