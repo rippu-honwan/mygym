@@ -25,7 +25,8 @@ paired with one app, so switch to MyGym once it is stable.
 
 ## Current phase
 
-**Phase 1: build unmodified openGym on iPhone + Watch** (simulator build OK 2026-11-09, waiting for the user's device test)
+**Phase 1** (simulator build OK, waiting for the user's device test) and **Phase 1b** (server running
+2026-11-09, waiting for the user to create a profile and pair)
 
 Phase 0 (environment check) done 2026-11-09.
 
@@ -117,6 +118,37 @@ open App/App.xcworkspace                # the .xcworkspace, not the .xcodeproj
   not us: wait a minute and run `pod install` in `frontend/ios/App` again.
 - After these steps git shows changes in `project.pbxproj`, `Podfile`, two Android gradle files
   and some untracked files. They are generated: do not commit them.
+
+## Server on the Mac (Phase 1b)
+
+Set up 2026-11-09: Colima 0.10.3, Docker 29.9, docker compose 5.7 (Homebrew). Upstream images
+`ghcr.io/duartesantos8/opengym-{api,web}:latest`, no server code changed yet.
+`.env` = `.env.example` defaults (`localhost:8080`) + `FIRST_USER_ADMIN=1`. Data in
+`~/dev/mygym/data/` (git-ignored). Colima does NOT start at login.
+
+```bash
+colima start                              # after a reboot
+cd ~/dev/mygym && docker compose up -d    # start the server
+docker compose ps                         # both containers "healthy"
+docker compose down                       # stop the server (data stays)
+colima stop                               # stop the VM
+```
+
+Addresses: Mac browser `http://localhost:8080`, iPhone `http://<mac-name>.local:8080`
+(same Wi-Fi; plain http, home network only).
+
+Claude: MCP server `opengym` registered with `claude mcp add --scope local` for
+`~/dev/mygym` only (reads `data/` directly). Open Claude Code in `~/dev/mygym` to use it.
+
+### The user's steps
+
+1. Mac browser: `http://localhost:8080` > create your profile (passkey / Touch ID). The first
+   profile becomes admin.
+2. Settings > Account > Pair the mobile app > confirm > note the 5-minute code.
+3. (After Phase 1 is on the iPhone) MyGym > Settings > Account > Connect to my server >
+   `http://<mac-name>.local:8080` + the code. Allow "Local Network" when iOS asks.
+   If macOS asks whether to accept incoming connections, allow.
+4. Tell Claude when done: Claude checks `data/db.json` and calls the MCP tools.
 
 ## Simulator limits
 
