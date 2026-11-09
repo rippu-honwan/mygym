@@ -99,8 +99,13 @@ iPhone, CSV visible in the Files app) and 2b (iPhone -> Mac server `data/motion/
   last 5 minutes kept. `SessionStore.completeSet` slices set start -> tick, writes the CSV and
   sends it with `WCSession.transferFile`.
 - `bodyPart` added to the watch entry (`Model.swift`, `frontend/src/lib/watch-sync.js`).
-- iPhone: `WatchBridgePlugin` stores received files in `Documents/motion/`; `Info.plist`
-  `UIFileSharingEnabled` + `LSSupportsOpeningDocumentsInPlace` so the Files app shows them.
+- iPhone: `WatchBridgePlugin` stores received files in `Documents/motion/`.
+  Changed during build: NO Files app access. Capacitor's `Directory.Data` is the same
+  `Documents` folder, so `UIFileSharingEnabled` would also show the app's own data file there
+  (easy to delete by mistake). Instead the CSVs are copied to the Mac with devicectl (below);
+  2b uploads them.
+- Garmin snapshot strips `bodyPart` (memory budget); Wear OS fixture updated (Kotlin parser has
+  `ignoreUnknownKeys`).
 - CSV: line 1 `# {json metadata}`, then `t,ax,ay,az,rx,ry,rz,gx,gy,gz` (s, g, rad/s, g).
 
 ## Open questions
