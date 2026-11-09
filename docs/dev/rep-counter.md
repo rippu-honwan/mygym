@@ -35,10 +35,17 @@ Notes from the upstream docs:
 ## Decisions
 
 - 2026-11-09: bring openGym in by clone + push into the empty `mygym` repo (not a GitHub fork).
+- 2026-11-09: signing uses a **free Apple ID** (Xcode Personal Team). Consequences:
+  - The provisioning profile expires after 7 days: re-run from Xcode at least weekly, especially
+    during the 2-3 week data collection in Phase 3. Check that re-installing keeps recorded data.
+  - Limited number of App IDs per week, so Phase 1 builds only the iPhone app and the Watch app.
+    Planned for Phase 1 (local signing changes only): skip the iPhone widgets, the watch widgets
+    and AnimationPacksDownloader; drop the Associated Domains and NFC entitlements; rename bundle
+    ids and the App Group to our own. HealthKit and App Groups are expected to work on a free
+    team but are not verified yet.
 
 ## Open questions
 
-- Paid Apple Developer account or free Apple ID?
 - Apple Watch / iPhone model and watchOS / iOS versions?
 - OK to install CocoaPods with Homebrew?
 
