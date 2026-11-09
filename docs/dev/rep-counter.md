@@ -25,8 +25,8 @@ paired with one app, so switch to MyGym once it is stable.
 
 ## Current phase
 
-**Phase 1**: MyGym runs on the real iPhone (2026-11-09); watch app not installed yet (Xcode
-does not see the watch). **Phase 1b** done 2026-11-09: iPhone paired, routines synced to
+**Phase 1**: MyGym runs on the real iPhone and the watch app is installed and launches on the
+real watch (2026-11-09); iPhone-watch sync check pending. **Phase 1b** done 2026-11-09: iPhone paired, routines synced to
 `data/state-<uid>.json`, MCP `list_routines` returns them.
 
 Phase 0 (environment check) done 2026-11-09.
@@ -84,7 +84,8 @@ Notes from the upstream docs:
 ## Devices
 
 - iPhone 15 Pro, latest iOS (exact version not checked yet).
-- Apple Watch Series 10, 45 mm (watchOS version not checked yet; openGym needs watchOS 10+).
+- Apple Watch: the user said Series 10 45 mm; Xcode reports Apple Watch Series 9 (Watch7,2).
+  watchOS 27.0.1, Developer Mode on.
 
 ## Open questions
 
@@ -162,6 +163,12 @@ only came at 23:20 when MyGym was open in the foreground. Sync needs the app ope
 ## Real device notes (2026-11-09)
 
 - iPhone 15 Pro: iOS 27.0.1, Developer Mode on, connected to Xcode over Wi-Fi.
+- Watch UDID <watch UDID>, connects over Wi-Fi via the iPhone (drops sometimes:
+  retry). Watch build + install:
+  `xcodebuild -workspace App.xcworkspace -scheme OpenGymWatch -destination 'id=<watch UDID>'
+  -derivedDataPath build/dd-watch -allowProvisioningUpdates -allowProvisioningDeviceRegistration
+  DEVELOPMENT_TEAM=<TEAM_ID> build`, then `xcrun devicectl device install app --device
+  <watch UDID> build/dd-watch/Build/Products/Debug-watchos/OpenGymWatch.app`.
 - Team `<TEAM_ID>` (Personal Team). In Xcode the App Group had to be ticked once per
   target (Signing & Capabilities > App Groups); before that the profiles had an empty group list
   and the build failed with "doesn't match the entitlements file's value for
