@@ -98,6 +98,14 @@ open App/App.xcworkspace                # the .xcworkspace, not the .xcodeproj
 - After these steps git shows changes in `project.pbxproj`, `Podfile`, two Android gradle files
   and some untracked files. They are generated: do not commit them.
 
+## Simulator limits
+
+- The iPhone app does not run on the iOS 27 simulator: the GoogleMLKit pod (barcode scanner)
+  sets `EXCLUDED_ARCHS[sdk=iphonesimulator*] = arm64`, so the simulator build is x86_64 only,
+  and the iOS 27 simulator does not run x86_64 apps. Test the iPhone app on the real iPhone.
+- The watch app alone runs on the watch simulator, but it cannot sync without the iPhone app,
+  and the simulator has no real motion sensor. Rep counting is tested on the real watch only.
+
 ## How to test (Phase 1, on the devices)
 
 1. iPhone: Settings > Privacy & Security > Developer Mode > On (restarts the phone).
