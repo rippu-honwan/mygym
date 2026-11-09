@@ -25,8 +25,8 @@ paired with one app, so switch to MyGym once it is stable.
 
 ## Current phase
 
-**Phase 1**: MyGym runs on the real iPhone and the watch app is installed and launches on the
-real watch (2026-11-09); iPhone-watch sync check pending. **Phase 1b** done 2026-11-09: iPhone paired, routines synced to
+**Phase 1** done 2026-11-09: MyGym runs on the real iPhone and watch; routines show on the
+watch and a set ticked on the watch shows on the iPhone (the user's check). **Phase 1b** done 2026-11-09: iPhone paired, routines synced to
 `data/state-<uid>.json`, MCP `list_routines` returns them.
 
 Phase 0 (environment check) done 2026-11-09.
@@ -89,7 +89,7 @@ Notes from the upstream docs:
 
 ## Open questions
 
-- First exercise to count (needed in Phase 2).
+- First exercise to count (needed before Phase 2 starts).
 
 ## Upstream files changed
 
@@ -159,6 +159,9 @@ yet" until a device saves data (`data/state-<uid>.json` appears then).
 2026-11-09: end-to-end check passed. Pairing at 23:07, but the first upload (`PUT /api/data` 200)
 only came at 23:20 when MyGym was open in the foreground. Sync needs the app open on the phone
 (and the Mac awake, same Wi-Fi).
+- In-progress workouts never reach the server: `api/server.js` deletes `state.active` on every
+  push. A workout shows up in `data/` and the MCP only after it is finished on the phone.
+  Phase 2 motion data needs its own path to the Mac for the same reason.
 
 ## Real device notes (2026-11-09)
 
