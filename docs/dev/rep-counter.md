@@ -25,8 +25,9 @@ paired with one app, so switch to MyGym once it is stable.
 
 ## Current phase
 
-**Phase 1** (simulator build OK, waiting for the user's device test) and **Phase 1b** (server running,
-profile created 2026-11-09; waiting for Phase 1 so the iPhone can pair)
+**Phase 1**: MyGym runs on the real iPhone (2026-11-09); watch app not installed yet (Xcode
+does not see the watch). **Phase 1b**: iPhone paired with the Mac server 2026-11-09; no state
+file until the phone has data.
 
 Phase 0 (environment check) done 2026-11-09.
 
@@ -153,6 +154,21 @@ Claude: MCP server `opengym` registered with `claude mcp add --scope local` for
 Status 2026-11-09: step 1 done (profile `me`, admin; created with "Create new profile", not
 "Sign in with passkey"). MCP serves that profile and lists 11 tools; they answer "no synced state
 yet" until a device saves data (`data/state-<uid>.json` appears then).
+
+## Real device notes (2026-11-09)
+
+- iPhone 15 Pro: iOS 27.0.1, Developer Mode on, connected to Xcode over Wi-Fi.
+- Team `<TEAM_ID>` (Personal Team). In Xcode the App Group had to be ticked once per
+  target (Signing & Capabilities > App Groups); before that the profiles had an empty group list
+  and the build failed with "doesn't match the entitlements file's value for
+  com.apple.security.application-groups". HealthKit works on the free team.
+- Free team limit: 3 apps signed by this team per iPhone. The user also sideloads apps with AltStore
+  (same team), so MyGym only installed after the user removed one. AltStore refreshes use the same
+  team's App ID quota (10 per 7 days).
+- CLI build + install (Xcode Run works too):
+  `xcodebuild -workspace App.xcworkspace -scheme App -destination 'id=<iPhone UDID>'
+  -derivedDataPath build/dd-device -allowProvisioningUpdates DEVELOPMENT_TEAM=<TEAM_ID> build`, then
+  `xcrun devicectl device install app --device <UDID> build/dd-device/Build/Products/Debug-iphoneos/App.app`.
 
 ## Simulator limits
 
