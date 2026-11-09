@@ -25,8 +25,8 @@ paired with one app, so switch to MyGym once it is stable.
 
 ## Current phase
 
-**Phase 1** (simulator build OK, waiting for the user's device test) and **Phase 1b** (server running
-2026-11-09, waiting for the user to create a profile and pair)
+**Phase 1** (simulator build OK, waiting for the user's device test) and **Phase 1b** (server running,
+profile created 2026-11-09; waiting for Phase 1 so the iPhone can pair)
 
 Phase 0 (environment check) done 2026-11-09.
 
@@ -149,6 +149,10 @@ Claude: MCP server `opengym` registered with `claude mcp add --scope local` for
    `http://<mac-name>.local:8080` + the code. Allow "Local Network" when iOS asks.
    If macOS asks whether to accept incoming connections, allow.
 4. Tell Claude when done: Claude checks `data/db.json` and calls the MCP tools.
+
+Status 2026-11-09: step 1 done (profile `me`, admin; created with "Create new profile", not
+"Sign in with passkey"). MCP serves that profile and lists 11 tools; they answer "no synced state
+yet" until a device saves data (`data/state-<uid>.json` appears then).
 
 ## Simulator limits
 
