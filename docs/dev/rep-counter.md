@@ -229,6 +229,22 @@ The user did not want rest time in the data. Now the sensor runs only from **Sta
   about 6, 6 (+5 s of small fast shaking) and 7 big cycles. Ground truth must be the real count:
   The user sets reps with the crown before Done, or fixes them on the iPhone afterwards.
 
+## Phase 2b plan (approved 2026-11-11)
+
+iPhone uploads the CSVs to the Mac server when MyGym is open at home; each file is deleted on
+the phone only after the server answered OK.
+- Server: `PUT /api/motion` JSON `{name, csv}`, signed-in only (cookie or the phone's bearer),
+  strict file name check, writes `DATA_DIR/motion/<uid>/<name>` (same name = overwrite).
+  `openapi.yaml` entry, `api/test/server-motion.test.js`.
+- Server now runs OUR build: `docker compose up -d --build api`. Never `docker compose pull`
+  again (it would bring back the upstream image without this route).
+- iPhone native (`WatchBridgePlugin`): `listMotion`, `readMotion`, `deleteMotion`; event
+  `motionFile` when a CSV arrives.
+- iPhone JS: `frontend/src/lib/motion-upload.js` (+ test), started from `store/useStore.js`;
+  runs at launch, on `motionFile`, and when the app comes back to the front.
+- The user's 2026-11-11 test CSVs still on the iPhone are deleted from `data/motion/` after the first
+  upload (the user approved). The user deletes the 2 test workouts of 2026-11-11 in MyGym themselves.
+
 ## Server on the Mac (Phase 1b)
 
 Set up 2026-11-09: Colima 0.10.3, Docker 29.9, docker compose 5.7 (Homebrew). Upstream images
