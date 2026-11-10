@@ -197,6 +197,11 @@ To fix with 2b (not urgent): cap a set's window to the last `keepSec` (the buffe
 so old samples can survive a suspension). Still to verify in a real workout: samples continue for
 minutes with the wrist down and Apple Health on.
 
+Join check: the workout reached the server after the user opened MyGym (MCP `list_workouts`: Upper A
+2026-11-11, id `mwb3ek2dw8jk1` = the CSV's `wid`). The state's set has `r: 8` and
+`at: 1794339536329.6`; the CSV's `end` is 1794339536330. Labels for analysis: match CSV to the
+state's set by `wid` + `exId` + `at` == `end` (within 1 ms); the state's set has no `id`.
+
 Note: after a Mac restart the server is down until `colima start` + `docker compose up -d`; the
 phone keeps its changes and uploads once it can reach the server again.
 
