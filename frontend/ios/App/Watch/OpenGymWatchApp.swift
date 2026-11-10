@@ -526,11 +526,21 @@ struct ExercisePage: View {
             if entry.isTimed {
                 RoundButton(systemImage: "play.fill", label: Text("Start hold"), size: doneSize,
                             caption: !typeSize.isAccessibilitySize) { store.startHold() }
+            } else if current && store.recordsMotion(entry) && store.recordingSince == nil {
+                // Rep counter: the sensor records only from Start set to Done (MotionRecorder).
+                RoundButton(systemImage: "play.fill", label: Text("Start set"), size: doneSize,
+                            caption: !typeSize.isAccessibilitySize) { store.startSet() }
             } else {
                 // At the accessibility sizes the word under the check goes (VoiceOver still says it):
                 // the room it takes is what pushed the page up into the clock on 41 mm.
                 RoundButton(systemImage: "checkmark", label: Text("Done"), size: doneSize,
                             caption: !typeSize.isAccessibilitySize) { store.completeSet() }
+                    // Recording: a red dot on the button.
+                    .overlay(alignment: .topTrailing) {
+                        if current && store.recordingSince != nil {
+                            Circle().fill(Color.red).frame(width: 12, height: 12).accessibilityHidden(true)
+                        }
+                    }
             }
         }
         .disabled(!current)

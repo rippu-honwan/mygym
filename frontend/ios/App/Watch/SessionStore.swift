@@ -109,6 +109,8 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
 
     /// When the set now up began: the end of the rest before it, or the start of the session.
     private var setStartedAt = Date()
+    /// When Start set was pressed: the sensor records from then until Done (MotionRecorder).
+    @Published private(set) var recordingSince: Date?
     /// The last Done, against a double tap.
     private var lastTick: Date?
     /// Taps ignored for a second after the watch turns the page by itself (WatchCore's TouchLock).
@@ -252,7 +254,31 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
         return e.sets[si].sideUp
     }
 
+    /// Exercises that get a Start set button and their motion recorded: reps sets that move the wrist.
+    func recordsMotion(_ e: Entry) -> Bool {
+        !isDemo && !e.isTimed && !e.isCardio && MotionLog.records(bodyPart: e.bodyPart)
+    }
+
+    /// Start set: the rest (if any) ends here and the sensor records until Done.
+    func startSet() {
+        guard recordingSince == nil, let e = entry, setIndex != nil, recordsMotion(e) else { return }
+        if restEndsAt != nil { skipRest() }
+        ackRestOver()
+        noteActivity()
+        health.motion.start()
+        recordingSince = Date()
+        WKInterfaceDevice.current().play(.start)
+    }
+
+    /// A recording that ends without Done (skipped, another set picked, the workout over): no file.
+    private func stopRecording() {
+        guard recordingSince != nil else { return }
+        health.motion.stop()
+        recordingSince = nil
+    }
+
     func pick(set si: Int, in ei: Int) {
+        stopRecording()
         ackRestOver()
         picked[ei] = si
         if ei == entryIndex { loadTargets() }
@@ -367,9 +393,13 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
             }
             if next.workout != nil && next.workout != before.workout { self.noteActivity() }
             // Sets ticked on the phone: their heart rate from this watch's readings (Discord fuckdv).
-            for tick in SessionCore.phoneTicks(before.workout, next.workout) {
+            let ticks = SessionCore.phoneTicks(before.workout, next.workout)
+            for tick in ticks {
                 self.phoneTicked(tick, wid: next.workout?.id ?? "", resting: snap.active?.rest != nil)
             }
+            // A recording whose set was ticked on the phone, or whose workout ended or changed there:
+            // no file (the rep counter only learns from sets started and ended on the wrist).
+            if !ticks.isEmpty || next.workout?.id != before.workout?.id { self.stopRecording() }
             if let rest = snap.active?.rest, next.workout?.id == snap.active?.id {
                 let end = Date(timeIntervalSince1970: rest.endsAt / 1000)
                 if end != self.restEndsAt { self.startRest(until: end, notify: true) }
@@ -441,15 +471,16 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
         // Sent first, saved second: killed in between, the phone still has the tick (and the next
         // snapshot brings it back here); the other way round the tick would be lost on the phone.
         if let event = event { send(event: event) }
-        if !isDemo {
-            // The set's motion, from its start to this tick, for the rep counter (MotionRecorder).
+        if let since = recordingSince {
+            // The set's motion, from Start set to this Done, for the rep counter (MotionRecorder).
             var meta: [String: Any] = [:]
             if let tr = tr { meta["reps"] = tr }
             if let tw = tw { meta["w"] = tw }
             if let wid = w.id { meta["wid"] = wid }
             if let id = event?["id"] { meta["id"] = id }
-            health.motion.send(entry: e, set: si, from: setFrom, to: now, meta: meta)
+            health.motion.send(entry: e, set: si, from: since, to: now, meta: meta)
         }
+        stopRecording()
         state = next
         setStartedAt = now
         picked[ei] = nil
@@ -497,6 +528,7 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
     /// A set passed over (a long press on Done): not done, the next one comes up.
     func skipSet() {
         guard touchAllowed, let si = setIndex else { return }
+        stopRecording()
         ackRestOver()
         let ei = entryIndex
         state = SessionCore.skip(state, entry: ei, set: si)
@@ -713,6 +745,7 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
         let (next, event) = SessionCore.start(state, session, wid: "watch-" + UUID().uuidString,
                                               at: now.timeIntervalSince1970 * 1000, id: UUID().uuidString, bw: bw)
         send(event: event)
+        stopRecording()
         state = next
         picked = [:]
         setStartedAt = now
@@ -829,6 +862,7 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
         guard let ev = event else { return }
         if let w = ended { summary = SessionCore.summary(w, end: now, startedAt: workoutSeenAt.map { $0.timeIntervalSince1970 * 1000 }) }
         ran(ended?.id)
+        stopRecording()
         health.end(save: true, at: end) { [weak self] totals in self?.addTotals(totals) }
         stopHoldCount()
         stopHold()
@@ -844,6 +878,7 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
         closeRest(at: Date())
         let (next, event) = SessionCore.finish(state, at: Date().timeIntervalSince1970 * 1000, id: UUID().uuidString, discard: true)
         guard let ev = event else { return }
+        stopRecording()
         health.end(save: false)
         stopHoldCount()
         stopHold()

@@ -5,13 +5,13 @@ import WatchConnectivity
 /*
  * Motion data for the rep counter (docs/dev/rep-counter.md, WatchCore MotionLog.swift).
  *
- * deviceMotion at MotionLog.hz while a workout runs (WorkoutManager start/end), the last
- * MotionLog.keepSec kept in memory. It runs on the workout session's background time: with Apple
- * Health off there is no session, and the watch stops it once the wrist drops.
+ * deviceMotion at MotionLog.hz from Start set to Done (SessionStore.startSet / completeSet), at
+ * most the last MotionLog.keepSec kept. It runs on the workout session's background time: with
+ * Apple Health off there is no session, and the watch stops it once the wrist drops.
  *
- * Each ticked set of an exercise that moves the wrist becomes one CSV in `outbox`, sent to the
- * phone with transferFile. A file is deleted only once its transfer finished without an error
- * (SessionStore didFinish fileTransfer); whatever is left is sent again at the next start.
+ * Each set becomes one CSV in `outbox`, sent to the phone with transferFile. A file is deleted
+ * only once its transfer finished without an error (SessionStore didFinish fileTransfer);
+ * whatever is left is sent again at the next start.
  */
 final class MotionRecorder {
     private let manager = CMMotionManager()
@@ -31,8 +31,11 @@ final class MotionRecorder {
         return dir
     }
 
+    /// A fresh recording: what an earlier one left is dropped.
     func start() {
-        guard manager.isDeviceMotionAvailable, !manager.isDeviceMotionActive else { return }
+        guard manager.isDeviceMotionAvailable else { return }
+        if manager.isDeviceMotionActive { manager.stopDeviceMotionUpdates() }
+        queue.addOperation { [weak self] in self?.samples = [] }
         MotionRecorder.resendLeftovers()
         manager.deviceMotionUpdateInterval = 1 / MotionLog.hz
         // deviceMotion's timestamp counts from boot; this makes it seconds since 1970.
@@ -64,7 +67,8 @@ final class MotionRecorder {
     /// One ticked set: its CSV written to the outbox and sent to the phone.
     func send(entry e: Entry, set si: Int, from: Date, to: Date, meta extra: [String: Any]) {
         guard MotionLog.records(bodyPart: e.bodyPart) else { return }
-        let a = from.timeIntervalSince1970, b = to.timeIntervalSince1970
+        let b = to.timeIntervalSince1970
+        let a = max(from.timeIntervalSince1970, b - MotionLog.keepSec)
         let s = window(from: a, to: b)
         guard !s.isEmpty else { return }
         var meta = extra

@@ -143,6 +143,10 @@ const OWN = {
   'Start hold': {
     de: 'Halten starten', fr: 'Lancer la tenue', es: 'Empezar', it: 'Inizia la tenuta', 'pt-PT': 'Começar', 'pt-BR': 'Começar', pl: 'Start', hu: 'Indítás', tr: 'Başlat', ru: 'Начать', uk: 'Почати', ar: 'ابدأ', hi: 'शुरू करें', bn: 'শুরু করুন', th: 'เริ่ม', ko: '시작', 'zh-Hans': '开始', 'zh-Hant': '開始',
   },
+  // The rep counter's button before a set: the sensor records from here to Done.
+  'Start set': {
+    de: 'Satz starten', fr: 'Lancer la série', es: 'Empezar serie', it: 'Inizia la serie', 'pt-PT': 'Começar série', 'pt-BR': 'Começar série', pl: 'Zacznij serię', hu: 'Sorozat indítása', tr: 'Seti başlat', ru: 'Начать подход', uk: 'Почати підхід', ar: 'ابدأ المجموعة', hi: 'सेट शुरू करें', bn: 'সেট শুরু করুন', th: 'เริ่มเซ็ต', ko: '세트 시작', 'zh-Hans': '开始', 'zh-Hant': '開始',
+  },
   'Workout saved': {
     de: 'Training gespeichert', fr: 'Séance enregistrée', es: 'Entreno guardado', it: 'Allenamento salvato', 'pt-PT': 'Treino guardado', 'pt-BR': 'Treino salvo', pl: 'Trening zapisany', hu: 'Edzés mentve', tr: 'Antrenman kaydedildi', ru: 'Тренировка сохранена', uk: 'Тренування збережено', ar: 'تم حفظ التمرين', hi: 'वर्कआउट सहेजा गया', bn: 'ওয়ার্কআউট সেভ হয়েছে', th: 'บันทึกการฝึกแล้ว', ko: '운동 저장됨', 'zh-Hans': '训练已保存', 'zh-Hant': '訓練已儲存',
   },
