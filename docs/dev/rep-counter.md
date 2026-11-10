@@ -182,6 +182,24 @@ watch by hand:
 build/dd-device/Build/Products/Debug-iphoneos/App.app/Watch/OpenGymWatch.app`.
 Keep the iPhone unlocked (screen on) during installs, or the developer disk image cannot mount.
 
+### First real data (2026-11-11)
+
+Copied with devicectl to `data/motion-phone/` (git-ignored):
+- `20261111-043812_0025_s1.csv` (bench press, the user's quick simulation, 8 reps logged): 2200 rows,
+  44.2 s, 49.7 Hz, max gap 0.021 s, `bodyPart` chest. ~35 s idle (watch flat), then ~9 s of clear
+  ~1 Hz up/down movement. A naive peak count on vertical acceleration (< 1.5 Hz low-pass) finds 6
+  of 8: fine for a first look, the real counter is Phase 4.
+- `20261110-192450_0047_s1.csv` (incline bench, the watch-started workout of 2026-11-10 while sync
+  was broken): 146 s at 50 Hz, then a 2.5 h gap, then the last 5 s before the tick. The watch app
+  was suspended, probably no workout session (Apple Health setting had not reached the watch).
+
+To fix with 2b (not urgent): cap a set's window to the last `keepSec` (the buffer trims by count,
+so old samples can survive a suspension). Still to verify in a real workout: samples continue for
+minutes with the wrist down and Apple Health on.
+
+Note: after a Mac restart the server is down until `colima start` + `docker compose up -d`; the
+phone keeps its changes and uploads once it can reach the server again.
+
 ## Server on the Mac (Phase 1b)
 
 Set up 2026-11-09: Colima 0.10.3, Docker 29.9, docker compose 5.7 (Homebrew). Upstream images
