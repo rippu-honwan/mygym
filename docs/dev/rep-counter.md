@@ -205,6 +205,25 @@ state's set by `wid` + `exId` + `at` == `end` (within 1 ms); the state's set has
 Note: after a Mac restart the server is down until `colima start` + `docker compose up -d`; the
 phone keeps its changes and uploads once it can reach the server again.
 
+### Start set button (the user's request, 2026-11-11)
+
+The user did not want rest time in the data. Now the sensor runs only from **Start set** to **Done**
+(commit "feat: start set button for motion recording"):
+- Watch set page: for reps exercises that move the wrist, the big button reads "Start set" (play)
+  until pressed, then "Done" with a red dot. Leg exercises, holds and cardio unchanged.
+- Start set ends a running rest, marks activity (keeps the Health workout session running),
+  starts the sensor and plays a haptic. Done sends the CSV of exactly that window (capped at
+  `keepSec`) and stops the sensor.
+- No file when the recording ends without Done: set skipped, another set picked, the workout
+  finished/discarded/started, a set ticked on the phone, or the workout ended or changed there.
+- Forgot Start: press Start then Done -> a very short CSV; drop CSVs under ~2 s in analysis.
+- `WorkoutManager` no longer starts the sensor with the workout; it still stops it on pause/end.
+- Strings: "Start set" in `ci/watch-strings.mjs` (zh-Hant 開始; other languages are my own
+  translations, unchecked), regenerated .lproj files.
+- Checked: WatchCore 73 tests, frontend tests (only the known local `app-icons` failure);
+  signed build installed on iPhone, then the embedded watch app on the watch. Not yet tried by
+  The user.
+
 ## Server on the Mac (Phase 1b)
 
 Set up 2026-11-09: Colima 0.10.3, Docker 29.9, docker compose 5.7 (Homebrew). Upstream images
