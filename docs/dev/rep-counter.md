@@ -168,8 +168,19 @@ WatchConnectivity reports `isWatchAppInstalled = false`, so the phone sends noth
 the watch app and tapped Install in the iPhone Watch app: nothing happened. Checked: the embedded
 and the standalone watch app are both signed with a profile that lists the watch UDID and the
 App Group (valid to 2026-11-16), so signing is not the cause. Suspect the iPhone's companion
-record got confused by two separate installs. Next: restart both devices and install from the
-Watch app; else reinstall from the Mac at home. Not resolved yet.
+record got confused by two separate installs. Restarting both devices did not help.
+RESOLVED 2026-11-11 at home: reinstalled the iPhone app (devicectl); the iPhone did NOT install
+the watch app by itself within 90 s; then installed the watch app copy EMBEDDED in the iPhone app
+(`App.app/Watch/OpenGymWatch.app`) straight onto the watch, the user opened it on the watch by hand
+(remote launch is refused while the watch sits on the clock face), and the iPhone's Apple Watch
+page says installed again. Likely cause (not proven): in 2a the watch got the separately built
+`build/dd-watch` copy, not the one inside the iPhone app.
+
+Rule from now on: install the iPhone app, then the embedded watch app, then open MyGym on the
+watch by hand:
+`xcrun devicectl device install app --device <watch UDID>
+build/dd-device/Build/Products/Debug-iphoneos/App.app/Watch/OpenGymWatch.app`.
+Keep the iPhone unlocked (screen on) during installs, or the developer disk image cannot mount.
 
 ## Server on the Mac (Phase 1b)
 
