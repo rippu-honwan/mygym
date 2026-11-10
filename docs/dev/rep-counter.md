@@ -173,7 +173,7 @@ RESOLVED 2026-11-11 at home: reinstalled the iPhone app (devicectl); the iPhone 
 the watch app by itself within 90 s; then installed the watch app copy EMBEDDED in the iPhone app
 (`App.app/Watch/OpenGymWatch.app`) straight onto the watch, the user opened it on the watch by hand
 (remote launch is refused while the watch sits on the clock face), and the iPhone's Apple Watch
-page says installed again. Likely cause (not proven): in 2a the watch got the separately built
+page says installed again; starting Upper A on the iPhone opens it on the watch (the user, 2026-11-11). Likely cause (not proven): in 2a the watch got the separately built
 `build/dd-watch` copy, not the one inside the iPhone app.
 
 Rule from now on: install the iPhone app, then the embedded watch app, then open MyGym on the
