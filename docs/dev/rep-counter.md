@@ -259,6 +259,20 @@ reinstall), then on the iPhone at home; Claude checks `data/motion/<uid>/` got t
 and the iPhone's `Documents/motion` is empty, then deletes those 5 test files. The user still has to
 delete the 2 test workouts of 2026-11-11 in MyGym.
 
+## Training data and schedule (2026-11-11)
+
+- Hevy history `~/Downloads/workout_data 3.csv` (the user's export): dry run with the app's own
+  `parseImportFile`: 15 workouts, 280 sets, 2026-10-13 .. 2026-11-10; all exercises matched
+  except "Seated Chest Flys (Cable)" (becomes a custom exercise); 36 sets of 13-14 Oct have 0
+  reps (not logged in Hevy). The user imports it in the app (Settings > Data & backup > Import from
+  another app), so it syncs like any change.
+- New 4-day schedule from 2026-11-11 as a plan file `~/Downloads/mygym-new-plan.json`
+  (validated with `parsePlan`: 4 routines, 29 exercises, 0 dropped): Tue 軀幹 A, Wed 四肢 A,
+  Fri 軀幹 B, Sat 四肢 B; Mon/Thu/Sun rest. Exercise ids reuse the ids the Hevy history maps to
+  where one exists (last time / progression connect). Rep ranges as `repsMin`/`repsMax`,
+  "6, 7 輪流做" as supersets (`sg`), 試/坐位調高/由下向上 as notes. Imported with "Use this weekly
+  schedule" (replaces the Mon-Sun plan); the user then deletes the old Upper A/B, Lower A/B routines.
+
 ## Server on the Mac (Phase 1b)
 
 Set up 2026-11-09: Colima 0.10.3, Docker 29.9, docker compose 5.7 (Homebrew). Upstream images
