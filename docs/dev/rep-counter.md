@@ -160,6 +160,17 @@ verified on a real workout.
    --domain-identifier com.rippuhonwan.mygym --source Documents/motion --destination data/motion-phone`
    and checks: curl sets present, leg set absent, ~50 rows/s, reps visible in a plot.
 
+### Problem found 2026-11-11: iPhone and watch stopped syncing
+
+After the 2a reinstall (iPhone app by devicectl, then the watch app by devicectl straight onto
+the watch) MyGym > Settings > Apple Watch said "openGym is not on your Apple Watch yet":
+WatchConnectivity reports `isWatchAppInstalled = false`, so the phone sends nothing. The user deleted
+the watch app and tapped Install in the iPhone Watch app: nothing happened. Checked: the embedded
+and the standalone watch app are both signed with a profile that lists the watch UDID and the
+App Group (valid to 2026-11-16), so signing is not the cause. Suspect the iPhone's companion
+record got confused by two separate installs. Next: restart both devices and install from the
+Watch app; else reinstall from the Mac at home. Not resolved yet.
+
 ## Server on the Mac (Phase 1b)
 
 Set up 2026-11-09: Colima 0.10.3, Docker 29.9, docker compose 5.7 (Homebrew). Upstream images
