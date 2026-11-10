@@ -245,6 +245,20 @@ the phone only after the server answered OK.
 - The user's 2026-11-11 test CSVs still on the iPhone are deleted from `data/motion/` after the first
   upload (the user approved). The user deletes the 2 test workouts of 2026-11-11 in MyGym themselves.
 
+### Phase 2b status (2026-11-11)
+
+Code committed ("feat: upload watch motion to server"). Checked: api 801 tests (incl.
+`server-motion`, openapi route check), frontend 7836 (only the known local `app-icons` failure),
+WatchCore 73. Server rebuilt from our code (`docker compose up -d --build api`): health OK,
+`PUT /api/motion` answers 401 unsigned. iPhone + embedded watch app installed. `build:mobile`
+failed at `pod install` (the `build/` folder lost its xattr after `xcodebuild clean` recreated it;
+re-marked), but the new JS was copied before that and is inside the installed app.
+
+NOT yet verified: the real upload. Next time: the user opens MyGym on the watch (once, after the
+reinstall), then on the iPhone at home; Claude checks `data/motion/<uid>/` got the 5 test CSVs
+and the iPhone's `Documents/motion` is empty, then deletes those 5 test files. The user still has to
+delete the 2 test workouts of 2026-11-11 in MyGym.
+
 ## Server on the Mac (Phase 1b)
 
 Set up 2026-11-09: Colima 0.10.3, Docker 29.9, docker compose 5.7 (Homebrew). Upstream images
