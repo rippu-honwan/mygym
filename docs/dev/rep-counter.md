@@ -221,8 +221,13 @@ The user did not want rest time in the data. Now the sensor runs only from **Sta
 - Strings: "Start set" in `ci/watch-strings.mjs` (zh-Hant 開始; other languages are my own
   translations, unchecked), regenerated .lproj files.
 - Checked: WatchCore 73 tests, frontend tests (only the known local `app-icons` failure);
-  signed build installed on iPhone, then the embedded watch app on the watch. Not yet tried by
-  The user.
+  signed build installed on iPhone, then the embedded watch app on the watch.
+- The user's test 2026-11-11 (bench press 0025, workout `mwb425oqogoei`, 3 sets): windows 8.5 s,
+  15.4 s, 9.0 s; first sample within 0.04 s of Start; 49.7 Hz, max gap 0.021 s; rests between
+  sets (8.4 s, 3.4 s) not recorded. CSV `end` == the server's set `at` to the ms.
+- Label problem: all 3 sets logged 8 reps (the routine's target, unchanged), but the plots show
+  about 6, 6 (+5 s of small fast shaking) and 7 big cycles. Ground truth must be the real count:
+  The user sets reps with the crown before Done, or fixes them on the iPhone afterwards.
 
 ## Server on the Mac (Phase 1b)
 
