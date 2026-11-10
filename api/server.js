@@ -2075,6 +2075,9 @@ function dataWritable() {
   return ok;
 }
 
+// `20261111-045641_0025_s1.csv`: the watch's MotionLog.fileName (start, exercise id, set).
+const MOTION_NAME = /^\d{8}-\d{6}_[A-Za-z0-9_-]{1,40}_s\d{1,3}\.csv$/;
+
 const routes = {
   // 503 rather than a flag in a 200: the container healthcheck is `wget --spider`, which reads
   // the status and nothing else, and an instance that cannot write its data directory is exactly
@@ -2082,6 +2085,22 @@ const routes = {
   'GET /api/health': async (req, res) => {
     if (!dataWritable()) return json(res, 503, { ok: false, writable: false });
     json(res, 200, { ok: true, users: db.users.length, writable: true });
+  },
+
+  // Rep counter (docs/dev/rep-counter.md): one CSV of Apple Watch motion per set, sent by the
+  // paired phone and kept as sent in DATA_DIR/motion/<uid>/ for analysis on this machine. The
+  // strict name is the whole path check: no slash, no dot segment can get through it.
+  'PUT /api/motion': async (req, res) => {
+    const user = readSession(req);
+    if (!user) return json(res, 401, { error: 'not signed in' });
+    const { name, csv } = await readBody(req);
+    if (typeof name !== 'string' || !MOTION_NAME.test(name) || typeof csv !== 'string' || !csv.startsWith('# {')) {
+      return json(res, 400, { error: 'bad motion file' });
+    }
+    const dir = path.join(DATA, 'motion', user.id);
+    fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+    durableWrite(path.join(dir, name), csv, 0o600);
+    json(res, 200, { ok: true });
   },
 
   // Public config the login screen needs before anyone is signed in. `coach` is absent unless

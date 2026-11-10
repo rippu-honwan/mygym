@@ -759,6 +759,41 @@ paths:
                   exp: { type: integer }
               example: { code: "K7WQ-2MZP-8RTA", exp: 1761743400000 }
         '401': { $ref: '#/components/responses/Unauthorized' }
+  /api/motion:
+    put:
+      tags: [watch]
+      operationId: motionUpload
+      summary: One set's Apple Watch motion, as a CSV (rep counter)
+      description: |
+        The paired iPhone uploads each CSV the watch recorded between Start set and Done. Kept as
+        sent in `DATA_DIR/motion/<uid>/<name>`; the same name again replaces the file. The name is
+        the watch's `yyyyMMdd-HHmmss_<exerciseId>_s<set>.csv`, and the CSV starts with a
+        `# {json}` metadata line (docs/dev/rep-counter.md).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, csv]
+              properties:
+                name: { type: string, pattern: '^\d{8}-\d{6}_[A-Za-z0-9_-]{1,40}_s\d{1,3}\.csv$' }
+                csv: { type: string, description: 'Starts with "# {".' }
+      responses:
+        '200':
+          description: Stored.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+        '400':
+          description: A name or CSV that does not look like the watch's.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
   /api/watch/redeem:
     post:
       tags: [watch]

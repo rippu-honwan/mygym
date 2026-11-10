@@ -52,6 +52,9 @@ public class WatchBridgePlugin: CAPPlugin, CAPBridgedPlugin, WCSessionDelegate {
         CAPPluginMethod(name: "sendClips", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "openOnWatch", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "dropClips", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "listMotion", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "readMotion", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "deleteMotion", returnType: CAPPluginReturnPromise),
     ]
 
     private let queue = DispatchQueue(label: "ch.opengym.watch-events")
@@ -156,6 +159,39 @@ public class WatchBridgePlugin: CAPPlugin, CAPBridgedPlugin, WCSessionDelegate {
             WCSession.default.outstandingFileTransfers.forEach { $0.cancel() }
         }
         clipQueue.async { self.clipsSent = [:] }
+        call.resolve()
+    }
+
+    /* ---------- the rep counter's motion files (lib/motion-upload.js) ---------- */
+
+    private static var motionDir: URL {
+        FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("motion", isDirectory: true)
+    }
+    /// Only a plain file name inside motionDir: nothing the page sends can reach another folder.
+    private static func motionFile(_ call: CAPPluginCall) -> URL? {
+        guard let name = call.getString("name"), name.hasSuffix(".csv"), name == (name as NSString).lastPathComponent,
+              !name.hasPrefix(".") else { return nil }
+        return motionDir.appendingPathComponent(name)
+    }
+
+    /// The CSVs waiting for the server, oldest first.
+    @objc func listMotion(_ call: CAPPluginCall) {
+        let names = ((try? FileManager.default.contentsOfDirectory(atPath: WatchBridgePlugin.motionDir.path)) ?? [])
+            .filter { $0.hasSuffix(".csv") }.sorted()
+        call.resolve(["names": names])
+    }
+
+    @objc func readMotion(_ call: CAPPluginCall) {
+        guard let url = WatchBridgePlugin.motionFile(call), let csv = try? String(contentsOf: url, encoding: .utf8) else {
+            return call.reject("no such motion file")
+        }
+        call.resolve(["csv": csv])
+    }
+
+    /// Only after the server answered OK (motion-upload.js): the phone's copy is not needed any more.
+    @objc func deleteMotion(_ call: CAPPluginCall) {
+        guard let url = WatchBridgePlugin.motionFile(call) else { return call.reject("bad name") }
+        try? FileManager.default.removeItem(at: url)
         call.resolve()
     }
 
@@ -314,11 +350,13 @@ public class WatchBridgePlugin: CAPPlugin, CAPBridgedPlugin, WCSessionDelegate {
     public func session(_ session: WCSession, didReceive file: WCSessionFile) {
         guard let name = file.metadata?["motion"] as? String else { return }
         let fm = FileManager.default
-        let dir = fm.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("motion", isDirectory: true)
+        let dir = WatchBridgePlugin.motionDir
         try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
         let to = dir.appendingPathComponent((name as NSString).lastPathComponent)
         try? fm.removeItem(at: to)      // the same set sent again: the newer copy wins
         try? fm.moveItem(at: file.fileURL, to: to)
+        // The page uploads it now if the server is in reach (lib/motion-upload.js).
+        DispatchQueue.main.async { self.notifyListeners("motionFile", data: ["name": to.lastPathComponent]) }
     }
 
     /// The page asked for the status before the session was up (right after launch): it is told now.
