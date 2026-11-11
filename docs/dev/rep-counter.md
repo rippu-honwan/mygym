@@ -527,3 +527,25 @@ Fixed and installed (commit "fix: watch list taps, rolling digits, rest overtime
   then `restOverSince` shows "-0:07" in red on the exercise page until Start set / Done.
 - Water lock button removed from rest, hold and finish pages.
 NOT yet verified by the user.
+
+### Counter v1 undercounts; velocity is the better signal (2026-11-11 23:00)
+
+The user's second home test, 10 real reps each (told in chat; the logged reps are the counter's):
+bench 5, 7, 6 (one more set not found on the server), curl 9, 9. "The first reps are not
+counted, sometimes it only starts at the 4th."
+Cause seen in the data (files `2248*`/`2249*`): the user starts lifting about 1 s after Start set.
+The gravity zigzag measures distance from its last turning point, which at first is the pose he
+tapped Start in; small-tilt reps (bench: 0.2-0.4) far from that pose never look like a reversal,
+so several reps melt into one 4-6 s "segment". In a curl the first up-stroke is merged with the
+move from that pose, and the last down-stroke has no reversal after it: 9 of 10.
+Better signal: velocity along the movement, from band-passed acceleration (vertical component
+= userAcceleration . gravity). In all four files it is a clean sine with exactly 10 swings, also
+for the bench press where the wrist hardly tilts, and its zero crossings ARE the highest and
+lowest points (what the user asked for: the tap can come at the bottom, not into the next rep).
+Prototype `docs/dev/rep-counter-tools/vel_prototype.py` (causal, Schmitt trigger at 1.0 x recent
+RMS, crude size gate): tonight's four sets 10, 10, 11, 10 (v1: 5, 7, 6, 9).
+NOT ready: on the gym sets it counts too much (+1..+8 on whole sets, far more on the long junk
+ones): every move while getting into position swings the velocity too. Needs a regularity gate
+(period and size like the reps before), a decision between vertical and principal axis (machine
+chest press and rows move sideways: the principal-axis variant did better there), and sets with
+true counts. Proposed to the user as v2; not built.
