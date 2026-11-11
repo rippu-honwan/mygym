@@ -502,3 +502,12 @@ New file in the generated Xcode project: `WatchCore/Sources/WatchCore/RepCounter
 by hand (xcodeproj one-liner); a fresh `ci/add-watch-app.rb` run picks it up by itself.
 Dynamic Island: `ci/add-widgets.rb` ran (bundle id `com.rippuhonwan.mygym.widgets`); the build
 stops at signing until the user ticks the App Group for target OpenGymWidgets in Xcode.
+
+### Installed 2026-11-11 22:27
+
+The user ticked the App Group for OpenGymWidgets in Xcode; the build went through
+(`App.app/PlugIns/OpenGymWidgets.appex`, its profile lists `group.com.rippuhonwan.mygym`).
+Installed the iPhone app, then the embedded watch app, both at the first try. On the devices
+now: crown by steps, exercise list + in-place editing, live rep count, Dynamic Island extension.
+NOT yet verified by the user: all four, and sync after this reinstall (he has to open the watch app
+by hand once).
