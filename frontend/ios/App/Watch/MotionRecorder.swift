@@ -23,6 +23,11 @@ final class MotionRecorder {
     }()
     /// Only touched on `queue`.
     private var samples: [MotionSample] = []
+    /// Counts the reps of the set being recorded, sample by sample (WatchCore RepCounter); only
+    /// touched on `queue`.
+    private var counter = RepCounter()
+    /// A rep was counted; called on the main queue.
+    var onRep: (() -> Void)?
 
     static var outbox: URL {
         let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
@@ -35,7 +40,10 @@ final class MotionRecorder {
     func start() {
         guard manager.isDeviceMotionAvailable else { return }
         if manager.isDeviceMotionActive { manager.stopDeviceMotionUpdates() }
-        queue.addOperation { [weak self] in self?.samples = [] }
+        queue.addOperation { [weak self] in
+            self?.samples = []
+            self?.counter = RepCounter()
+        }
         MotionRecorder.resendLeftovers()
         manager.deviceMotionUpdateInterval = 1 / MotionLog.hz
         // deviceMotion's timestamp counts from boot; this makes it seconds since 1970.
@@ -47,6 +55,9 @@ final class MotionRecorder {
             let s = MotionSample(t: bootAt + m.timestamp, ax: a.x, ay: a.y, az: a.z,
                                  rx: r.x, ry: r.y, rz: r.z, gx: g.x, gy: g.y, gz: g.z)
             self.samples.append(s)
+            if self.counter.push(t: s.t, gx: s.gx, gy: s.gy, gz: s.gz) {
+                DispatchQueue.main.async { self.onRep?() }
+            }
             if self.samples.count > cap { MotionLog.trim(&self.samples, now: s.t) }
         }
     }

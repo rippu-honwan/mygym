@@ -170,6 +170,7 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
             }
         }
         health.onStatus = { [weak self] in self?.sendStatus() }
+        health.motion.onRep = { [weak self] in self?.countRep() }
         let center = UNUserNotificationCenter.current()
         center.delegate = self
         if !isDemo { center.requestAuthorization(options: [.alert, .sound]) { _, _ in } }
@@ -267,7 +268,26 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
         noteActivity()
         health.motion.start()
         recordingSince = Date()
+        // The reps count up from 0 now; what was planned stays in sight as the goal.
+        repGoal = reps
+        autoReps = 0
+        reps = 0
         WKInterfaceDevice.current().play(.start)
+    }
+
+    /// While a set is recorded: the reps planned for it (the tile shows the count instead).
+    @Published private(set) var repGoal: Double?
+    /// What the counter itself counted in this set (the crown may have corrected `reps`).
+    private var autoReps = 0
+
+    /// The counter saw a rep (MotionRecorder.onRep): one more, and a tap on the wrist; a longer
+    /// one when the goal is reached.
+    private func countRep() {
+        guard recordingSince != nil else { return }
+        autoReps += 1
+        reps += 1
+        // ponytail: which taps are felt mid-set is the user's to say; these are a first pick.
+        WKInterfaceDevice.current().play(reps == repGoal ? .success : .directionUp)
     }
 
     /// A recording that ends without Done (skipped, another set picked, the workout over): no file.
@@ -275,6 +295,9 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
         guard recordingSince != nil else { return }
         health.motion.stop()
         recordingSince = nil
+        // Not counting any more: the plan's reps again (the next set loads its own after this).
+        if let goal = repGoal { reps = goal }
+        repGoal = nil
     }
 
     func pick(set si: Int, in ei: Int) {
@@ -298,6 +321,7 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
     /// Paging to another exercise (a vertical swipe).
     func show(entry ei: Int) {
         guard ei != state.entryIndex else { return }
+        stopRecording()
         ackRestOver()
         state.entryIndex = ei
         touchLock.unlock()          // swiped by hand: the page is the lifter's own choice
@@ -439,6 +463,8 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
         // A rating stays with its set through snapshots; another set starts unrated.
         if effortFor != setKey { effort = nil; effortFor = nil }
         guard let e = entry else { return }
+        // A set being counted keeps its count and weight (a snapshot from the phone calls this too).
+        guard recordingSince == nil else { return }
         let s = setIndex.map { e.sets[$0] } ?? e.sets.last
         if let row = s, let side = row.sideUp, let one = row.sides?[side] {
             weight = one.w ?? row.w ?? 0
@@ -474,7 +500,9 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
             if (e.sets[si].w ?? 0) > 0 { tw = weight }       // a weighted hold keeps its weight
         } else if !e.isCardio {
             tw = weight
-            tr = reps
+            // Recorded and nothing counted (a movement the counter cannot see): the planned reps,
+            // not a set of 0.
+            tr = recordingSince != nil && reps == 0 ? (repGoal ?? reps) : reps
         }
         let rated = effortKind.flatMap { k in effort.map { Effort.Rating(kind: k, value: $0) } }
         let (next, event) = SessionCore.tick(state, entry: ei, set: si, side: side, w: tw, r: tr, sec: tsec,
@@ -489,6 +517,9 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
             if let tw = tw { meta["w"] = tw }
             if let wid = w.id { meta["wid"] = wid }
             if let id = event?["id"] { meta["id"] = id }
+            // What the counter said, next to the reps logged: how good it is, set by set.
+            meta["auto"] = autoReps
+            if let goal = repGoal { meta["goal"] = goal }
             health.motion.send(entry: e, set: si, from: since, to: now, meta: meta)
         }
         stopRecording()

@@ -592,7 +592,7 @@ struct ExercisePage: View {
         let tint = row.warmup ? Theme.warmup : Color.white
         if entry.isBodyweight {
             VStack(spacing: 3) {
-                CrownTile(value: $store.reps, step: 1, upper: 200, unit: nil, label: Text("Reps"), tint: tint, large: true,
+                CrownTile(value: $store.reps, step: 1, upper: 200, unit: nil, label: repsLabel, tint: tint, large: true,
                           field: Crown.reps, focus: $crown)
                 Button { if current { editing = .weight } } label: {
                     Group {
@@ -612,10 +612,16 @@ struct ExercisePage: View {
             HStack(spacing: 6) {
                 CrownTile(value: $store.weight, step: weightStep(unit), upper: unit == "lb" ? 1500 : 700, unit: unit,
                           label: Text("Weight"), tint: tint, field: Crown.weight, focus: $crown)
-                CrownTile(value: $store.reps, step: 1, upper: 200, unit: nil, label: Text("Reps"), tint: tint,
+                CrownTile(value: $store.reps, step: 1, upper: 200, unit: nil, label: repsLabel, tint: tint,
                           field: Crown.reps, focus: $crown)
             }
         }
+    }
+
+    /// Under the reps: "Reps", or while the set is counted (the number runs up from 0) its goal.
+    private var repsLabel: Text {
+        guard let goal = store.repGoal else { return Text("Reps") }
+        return Text("Goal") + Text(verbatim: " \(formatNumber(goal))")
     }
 
     @ViewBuilder private func header(_ entry: Entry) -> some View {

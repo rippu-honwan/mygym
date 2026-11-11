@@ -14,7 +14,7 @@
 require 'xcodeproj'
 
 NAME = 'OpenGymWidgets'
-BUNDLE_ID = 'ch.opengym.app.widgets'
+BUNDLE_ID = 'com.rippuhonwan.mygym.widgets'
 SHARED = %w[WorkoutActivity.swift WidgetViews.swift].freeze
 
 dir = File.expand_path('../App', __dir__)

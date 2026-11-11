@@ -461,3 +461,44 @@ the reinstall. New findings:
   the Live Activity) was never added to the local project: only `ci/add-watch-app.rb` was run,
   not `ci/add-widgets.rb` (`App.app/PlugIns` does not exist). Its `BUNDLE_ID` is still
   `ch.opengym.app.widgets`.
+
+## Phase 4 + 5: live rep count (2026-11-11, first version)
+
+The user asked for it right after the first session: Start set, then a tap on the wrist per rep and
+the reps counting up from 0 with the planned reps shown as the goal.
+
+Algorithm (`WatchCore/RepCounter.swift`, 78 tests; the tuning twin is
+`docs/dev/rep-counter-tools/counter.py`, the two must stay the same counter): the smoothed
+GRAVITY vector (the wrist's orientation) zigzags between two directions. A reversal (the vector
+has moved back from its farthest point by 1.2 x the recent spread) is a turning point; one that
+lands where the one before last was proves half a rep; two halves are a rep. No acceleration yet.
+
+Result on the 2026-11-11 workout against the reps the user logged (not all of them certainly true
+counts: several equal the plan): of 12 sets with whole data, 10 within 1 rep.
+  chest press +0, (-5: 7 logged, 4-5 slow humps in the signal), bench +(-1), lateral raise +1 +1,
+  curl +0, seated row -1 +0 +0, overhead triceps +2 -1 +3.
+Not counted in that: 3 sets with a data gap (the app was suspended: -6, -2, +2) and 3 "sets" of
+100-190 s that were mostly not lifting (+16, +18, +6).
+
+Known limits, all told to the user:
+- A movement that does not turn the wrist (barbell bench, maybe pulldown / shoulder press) is
+  seen badly. Needs vertical acceleration as a second signal.
+- Moves made while getting into position can count (+1..+3 at the start of a set).
+- A rep is counted a moment into the next one (the reversal shows late), the last rep when the
+  wrist moves again (to the rack, to tap Done). If that last move carries on in the same
+  direction, the last rep is missed.
+- Tried and dropped: a "still for 0.7 s" rule and counting at the top of a rep (both counted too
+  much), dropping short runs (lost real reps after a wobble).
+
+On the watch: `MotionRecorder` feeds every sample to the counter and calls `onRep` on the main
+queue; `SessionStore.startSet` keeps the planned reps as `repGoal` and sets reps to 0;
+`countRep` adds one and taps the wrist (`.directionUp`, `.success` at the goal); the reps tile
+shows "Goal 8" under the count; the crown still corrects it. Done with 0 counted logs the goal,
+not 0. The CSV's metadata now carries `auto` (what the counter said) and `goal`, next to `reps`
+(what was logged): every set from now on measures the counter.
+NOT yet tried on the watch.
+
+New file in the generated Xcode project: `WatchCore/Sources/WatchCore/RepCounter.swift` was added
+by hand (xcodeproj one-liner); a fresh `ci/add-watch-app.rb` run picks it up by itself.
+Dynamic Island: `ci/add-widgets.rb` ran (bundle id `com.rippuhonwan.mygym.widgets`); the build
+stops at signing until the user ticks the App Group for target OpenGymWidgets in Xcode.
