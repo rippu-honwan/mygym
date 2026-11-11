@@ -390,7 +390,7 @@ describe('Workout set completion flow', () => {
     expect(mocks.S.active.entries[0].topW).toBe(60)
     expect(mocks.S.exWeights['plain-bench']).toBeUndefined()   // written at the finish, not while ticking
     expect(mocks.S.active.cur).toBe(0)
-    expect(mocks.startRest).toHaveBeenCalledWith(90, expect.any(Number), { forSet: expect.any(Number) })
+    expect(mocks.startRest).not.toHaveBeenCalled() // MyGym: no rest after an exercise's last set (restAfterSet)
 
     await pressNext()
 
@@ -414,7 +414,7 @@ describe('Workout set completion flow', () => {
     await toggleSet(1)
 
     expect(mocks.S.active.cur).toBe(1)
-    expect(mocks.startRest).toHaveBeenCalledWith(90, expect.any(Number), { forSet: expect.any(Number) })
+    expect(mocks.startRest).not.toHaveBeenCalled() // MyGym: no rest after an exercise's last set (restAfterSet)
 
     await pressNext()
 
@@ -438,8 +438,7 @@ describe('Workout set completion flow', () => {
       await toggleSet(0)
 
       expect(mocks.S.active.cur).toBe(0)
-      expect(mocks.startRest).toHaveBeenCalledTimes(1)
-      expect(mocks.startRest).toHaveBeenCalledWith(expect.any(Number), 0, { forSet: 0 })
+      expect(mocks.startRest).not.toHaveBeenCalled() // MyGym: no rest after an exercise's last set (restAfterSet)
     },
   )
 
@@ -459,8 +458,7 @@ describe('Workout set completion flow', () => {
     await toggleSet(1)
 
     expect(mocks.S.active.cur).toBe(1)
-    expect(mocks.startRest).toHaveBeenCalledTimes(1)
-    expect(mocks.startRest).toHaveBeenCalledWith(expect.any(Number), 1, { forSet: 0 })
+    expect(mocks.startRest).not.toHaveBeenCalled() // MyGym: no rest after an exercise's last set (restAfterSet)
   })
 
   it('leaves the completed ordinary exercise selected and still rests before the next exercise\'s warm-up (#853)', async () => {
@@ -478,7 +476,7 @@ describe('Workout set completion flow', () => {
     await toggleSet(0)
 
     expect(mocks.S.active.cur).toBe(0)
-    expect(mocks.startRest).toHaveBeenCalledTimes(1)
+    expect(mocks.startRest).not.toHaveBeenCalled() // MyGym: no rest after an exercise's last set (restAfterSet)
   })
 
   it('a re-check of the closing set before the next exercise\'s warm-up still owes its rest (#853)', async () => {
@@ -498,7 +496,7 @@ describe('Workout set completion flow', () => {
     await toggleSet(0)
 
     expect(mocks.S.active.cur).toBe(0)
-    expect(mocks.startRest).toHaveBeenCalledTimes(1)
+    expect(mocks.startRest).not.toHaveBeenCalled() // MyGym: no rest after an exercise's last set (restAfterSet)
   })
 
   // A rest that ran out stays on screen as Ready (#204) until it is dismissed. It is not a rest
@@ -535,7 +533,7 @@ describe('Workout set completion flow', () => {
     await toggleSet(5)
 
     expect(mocks.S.active.cur).toBe(1)
-    expect(mocks.startRest).toHaveBeenCalledWith(90, expect.any(Number), { forSet: expect.any(Number) })
+    expect(mocks.startRest).not.toHaveBeenCalled() // MyGym: no rest after an exercise's last set (restAfterSet)
   })
 
   it('does not auto-select an unfinished superset after completing an ordinary exercise', async () => {
@@ -551,7 +549,7 @@ describe('Workout set completion flow', () => {
     expect(mocks.S.active.cur).toBe(0)
     expect(mocks.workoutCompleteSheet).not.toHaveBeenCalled()
     expect(mocks.toast).toHaveBeenCalledWith('Hold logged')
-    expect(mocks.startRest).toHaveBeenCalledWith(90, expect.any(Number), { forSet: expect.any(Number) })
+    expect(mocks.startRest).not.toHaveBeenCalled() // MyGym: no rest after an exercise's last set (restAfterSet)
   })
 
   it('does not auto-select earlier unfinished work after completing an ordinary exercise', async () => {
@@ -564,7 +562,7 @@ describe('Workout set completion flow', () => {
 
     expect(mocks.S.active.cur).toBe(1)
     expect(mocks.workoutCompleteSheet).not.toHaveBeenCalled()
-    expect(mocks.startRest).toHaveBeenCalledWith(90, expect.any(Number), { forSet: expect.any(Number) })
+    expect(mocks.startRest).not.toHaveBeenCalled() // MyGym: no rest after an exercise's last set (restAfterSet)
   })
 
   it('leaves a completed ordinary exercise selected without declaring completion while work remains', async () => {
@@ -577,7 +575,7 @@ describe('Workout set completion flow', () => {
 
     expect(mocks.workoutCompleteSheet).not.toHaveBeenCalled()
     expect(mocks.S.active.cur).toBe(0)
-    expect(mocks.startRest).toHaveBeenCalledWith(90, expect.any(Number), { forSet: expect.any(Number) })
+    expect(mocks.startRest).not.toHaveBeenCalled() // MyGym: no rest after an exercise's last set (restAfterSet)
   })
 
   it('shows workout completion only when no unfinished unit remains', async () => {
@@ -2214,7 +2212,7 @@ describe('workout list view', () => {
 
     expect(mocks.S.active.entries[0].sets[0].done).toBe(true)
     expect(mocks.S.active.cur).toBe(0)
-    expect(mocks.startRest).toHaveBeenCalledWith(90, expect.any(Number), { forSet: expect.any(Number) })
+    expect(mocks.startRest).not.toHaveBeenCalled() // MyGym: no rest after an exercise's last set (restAfterSet)
   })
 
   it('does not declare the workout complete after a set of a non-current exercise while sets remain', async () => {
@@ -2393,7 +2391,7 @@ describe('workout compact view', () => {
     await toggleSet(0)
 
     expect(mocks.S.active.entries[0].sets[0].done).toBe(true)
-    expect(mocks.startRest).toHaveBeenCalledWith(90, expect.any(Number), { forSet: expect.any(Number) })
+    expect(mocks.startRest).not.toHaveBeenCalled() // MyGym: no rest after an exercise's last set (restAfterSet)
   })
 })
 

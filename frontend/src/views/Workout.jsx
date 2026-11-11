@@ -2104,9 +2104,8 @@ function ActiveWorkout() {
 
       const step = supersetFlowStep(fresh.entries, freshUnit, idx)
       if (!step) { onFocusProgress?.({ unitDone: freshUnitDone }); return }
-      if (step.unitDone) {
-        if (nextUnit?.length) startRest(restAfter, idx, { forSet: i })
-      } else {
+      // MyGym: no rest after a superset's last round, like any exercise's last set (restAfterSet).
+      if (!step.unitDone) {
         if (step.nextIdx != null) update(s => { if (s.active) s.active.cur = step.nextIdx })
         if (step.roundDone) startRest(restAfter, idx, { forSet: i })
       }

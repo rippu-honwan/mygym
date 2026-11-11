@@ -9,13 +9,12 @@ describe('restAfterSet', () => {
     expect(restAfterSet({ unitDone: false, lastUnit: true })).toBe(true)
   })
 
-  // Issue #3: a two-set exercise timed one rest instead of two, because the closing set
-  // "finished quietly". The next exercise still follows it, so the rest belongs there.
-  it('rests after the closing set when another exercise follows', () => {
-    expect(restAfterSet({ unitDone: true, lastUnit: false })).toBe(true)
+  // MyGym: the closing set of an exercise starts no rest, straight on to the next exercise.
+  it('does not rest after the closing set when another exercise follows', () => {
+    expect(restAfterSet({ unitDone: true, lastUnit: false })).toBe(false)
   })
 
-  it('stays quiet only on the very last set of the session', () => {
+  it('stays quiet on the very last set of the session', () => {
     expect(restAfterSet({ unitDone: true, lastUnit: true })).toBe(false)
   })
 })
@@ -88,8 +87,8 @@ describe('rest on a re-check', () => {
     expect(restOnRecheck({ timerRunning: false, unitDone: true, lastUnit: true })).toBe(false)
   })
 
-  it('rests after closing an exercise that is not the last one', () => {
-    expect(restOnRecheck({ timerRunning: false, unitDone: true, lastUnit: false })).toBe(true)
+  it('does not rest after closing an exercise (MyGym: straight on to the next one)', () => {
+    expect(restOnRecheck({ timerRunning: false, unitDone: true, lastUnit: false })).toBe(false)
   })
 })
 

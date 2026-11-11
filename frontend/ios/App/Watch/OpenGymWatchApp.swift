@@ -682,6 +682,7 @@ struct ValueEditor: View {
 
     /// The profile's effort scale; the effort editor turns a crown position (Effort.value).
     private var kind: String { store.effortKind ?? "rpe" }
+    /// The step of the + and − buttons: for a weight the exercise's own (its plates or stack).
     private var step: Double {
         switch field {
         case .weight: return entry.step.flatMap { $0 > 0 ? $0 : nil } ?? (unit == "lb" ? 5 : 2.5)
@@ -689,6 +690,11 @@ struct ValueEditor: View {
         case .seconds: return 5
         }
     }
+    /// The crown's step. MyGym: a weight turns in 0.5 kg (1 lb), fine enough for any cable stack
+    /// (3.5, 6.5, 8.5 kg), while the buttons jump the exercise's step.
+    private var crownStep: Double { field == .weight ? (unit == "lb" ? 1 : 0.5) : step }
+    // ponytail: first guess without the watch in hand; the user tunes it by feel.
+    private var crownSensitivity: DigitalCrownRotationalSensitivity { field == .weight ? .high : .medium }
     private var range: ClosedRange<Double> {
         switch field {
         case .weight: return 0...(unit == "lb" ? 1500 : 700)
@@ -743,8 +749,8 @@ struct ValueEditor: View {
                 .frame(maxWidth: .infinity)
                 .focusable()
                 .focused($focused)
-                .digitalCrownRotation($value, from: range.lowerBound, through: range.upperBound, by: step,
-                                      sensitivity: field == .weight ? DigitalCrownRotationalSensitivity.medium : DigitalCrownRotationalSensitivity.low, isContinuous: false, isHapticFeedbackEnabled: true)
+                .digitalCrownRotation($value, from: range.lowerBound, through: range.upperBound, by: crownStep,
+                                      sensitivity: crownSensitivity, isContinuous: false, isHapticFeedbackEnabled: true)
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(title)
                 .accessibilityValue(field == .effort && shown == "–" ? Text("None") : Text(verbatim: suffix.map { "\(shown) \($0)" } ?? shown))
@@ -758,7 +764,7 @@ struct ValueEditor: View {
                 stepButton("plus", Text("More")) { nudge(step) }
             }
             if field == .weight {
-                Text(verbatim: "± \(formatNumber(step)) \(unit)").font(.system(size: 10)).foregroundStyle(.secondary)
+                Text(verbatim: "± \(formatNumber(crownStep)) \(unit)").font(.system(size: 10)).foregroundStyle(.secondary)
             }
             Spacer(minLength: 2)
             Button { save(); dismiss() } label: {
@@ -784,8 +790,9 @@ struct ValueEditor: View {
     }
 
     private func nudge(_ d: Double) {
-        // On the step's grid, so + and − land on the same numbers the crown does.
-        let next = ((value + d) / step).rounded() * step
+        // From where the crown left it (MyGym: no snap to the step's grid, 8.5 + 2.5 is 11), kept
+        // on the crown's grid.
+        let next = ((value + d) / crownStep).rounded() * crownStep
         value = min(range.upperBound, max(range.lowerBound, next))
         WKInterfaceDevice.current().play(.click)
     }
@@ -1009,7 +1016,7 @@ struct RestView: View {
                 }
                 VStack(spacing: 1) {
                     Text("Rest").font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
-                    Text(timerInterval: Date()...end, countsDown: true)
+                    Text(timerInterval: min(Date(), end)...end, countsDown: true)
                         .font(.system(size: store.show.restRing ? countdownSize : countdownSize * 1.35, weight: .semibold, design: .rounded).monospacedDigit())
                         .minimumScaleFactor(0.5)
                         .lineLimit(1)
@@ -1068,7 +1075,7 @@ struct HoldView: View {
                 CountdownRing(start: store.holdStartedAt ?? end, end: end, color: .cyan)
                 VStack(spacing: 1) {
                     Text(store.entry?.name ?? "").font(.caption2.weight(.semibold)).foregroundStyle(.secondary).lineLimit(1)
-                    Text(timerInterval: Date()...end, countsDown: true)
+                    Text(timerInterval: min(Date(), end)...end, countsDown: true)
                         .font(.system(size: countdownSize, weight: .semibold, design: .rounded).monospacedDigit())
                         .minimumScaleFactor(0.5)
                         .lineLimit(1)

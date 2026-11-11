@@ -51,16 +51,12 @@ export function setProgressHighWater(entry, previous = 0) {
 /**
  * Whether completing a set should start a rest timer.
  *
- * A rest belongs after every completed set — the last set of an exercise included, because
- * another exercise follows it and you rest before that one too. The only set with nothing
- * left to time is the last set of the last exercise, where the session is over.
- *
- * Ordinary exercises used to "finish quietly" instead: an exercise started no rest on its
- * closing set, so a two-set exercise timed one rest instead of two (issue #3) and a rest
- * never carried across the gap into the next exercise. Supersets already did it this way.
+ * MyGym (docs/dev/rep-counter.md): a rest only between the sets of one exercise. The closing
+ * set of an exercise (or superset) starts none: straight on to the next exercise. Upstream
+ * openGym rests there too (its issue #3); the callers still pass `lastUnit`, as upstream's.
  */
-export function restAfterSet({ unitDone, lastUnit }) {
-  return !unitDone || !lastUnit
+export function restAfterSet({ unitDone }) {
+  return !unitDone
 }
 
 /**

@@ -205,6 +205,8 @@ enum SessionCore {
     ///                                     after the last one of a round
     ///   otherwise                         this exercise while it has sets to do, then the next one
     ///                                     that has; after the last, the Finish page (index = count)
+    /// MyGym: a rest only while this exercise (or superset) has sets to do; its last set goes
+    /// straight on to the next exercise (upstream rests there too).
     static func next(after s: SessionState, entry ei: Int, set si: Int) -> (entry: Int, rest: Bool) {
         guard let w = s.workout, w.entries.indices.contains(ei) else { return (s.entryIndex, false) }
         let count = w.entries.count
@@ -218,13 +220,13 @@ enum SessionCore {
                 let members = Array(lo...hi)
                 let inTurn = members.filter { $0 > ei } + members.filter { $0 <= ei }
                 if let n = inTurn.first(where: open) { return (n, n <= ei) }
-                if let n = ((hi + 1)..<count).first(where: open) ?? (0..<lo).first(where: open) { return (n, true) }
-                return (count, true)
+                if let n = ((hi + 1)..<count).first(where: open) ?? (0..<lo).first(where: open) { return (n, false) }
+                return (count, false)
             }
         }
         if open(ei) { return (ei, true) }
-        if let n = ((ei + 1)..<count).first(where: open) ?? (0..<ei).first(where: open) { return (n, true) }
-        return (count, true)
+        if let n = ((ei + 1)..<count).first(where: open) ?? (0..<ei).first(where: open) { return (n, false) }
+        return (count, false)
     }
 
     /// Whether workout `wid`, gone from this snapshot, was discarded on the phone (not finished):

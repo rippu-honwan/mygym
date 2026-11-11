@@ -89,6 +89,21 @@ final class SetTypesTests: XCTestCase {
         XCTAssertEqual(SessionCore.setIndex(s, entry: 0), 1)
     }
 
+    func testARestOnlyBetweenTheSetsOfOneExercise() {
+        let s0 = state([
+            entry("curl", "Curl", sets: [row(12, 10), row(12, 10)]),
+            entry("raise", "Lateral raise", sets: [row(8, 15)]),
+        ])
+        var s = SessionCore.tick(s0, entry: 0, set: 0, w: 12, r: 10, at: 1, id: "1").0
+        var n = SessionCore.next(after: s, entry: 0, set: 0)
+        XCTAssertEqual(n.entry, 0)
+        XCTAssertTrue(n.rest, "a rest before the exercise's next set")
+        s = SessionCore.tick(s, entry: 0, set: 1, w: 12, r: 10, at: 2, id: "2").0
+        n = SessionCore.next(after: s, entry: 0, set: 1)
+        XCTAssertEqual(n.entry, 1, "the last set done: the next exercise")
+        XCTAssertFalse(n.rest, "MyGym: no rest after an exercise's last set")
+    }
+
     func testASupersetGoesInTurnsAndRestsAfterTheRound() {
         let s0 = state([
             entry("curl", "Curl", sets: [row(12, 10), row(12, 10)], group: "a"),
@@ -107,6 +122,7 @@ final class SetTypesTests: XCTestCase {
         s = SessionCore.tick(s, entry: 1, set: 1, w: 20, r: 12, at: 4, id: "4").0
         n = SessionCore.next(after: s, entry: 1, set: 1)
         XCTAssertEqual(n.entry, 2, "the superset done: the next exercise")
+        XCTAssertFalse(n.rest, "MyGym: no rest after the superset's last round")
         s = SessionCore.tick(s, entry: 2, set: 0, w: 8, r: 15, at: 5, id: "5").0
         XCTAssertEqual(SessionCore.next(after: s, entry: 2, set: 0).entry, 3, "all done: the Finish page")
     }
