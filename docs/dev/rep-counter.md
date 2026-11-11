@@ -445,3 +445,19 @@ Checked: WatchCore 74 tests, frontend 7835 (1 skipped, only the known local `app
 failure). Built and installed 17:41: iPhone app, then the embedded watch app.
 NOT yet verified on the devices: sync after this reinstall, a rest running out with the wrist
 down, no rest after a last set, the crown's feel.
+
+### The user's test of the fixes (2026-11-11 evening)
+
+Confirmed by the user on the devices: no crash any more, no rest after a last set, sync works after
+the reinstall. New findings:
+- Crown too sensitive for weight and reps, and the number shows decimals while turning (5.1,
+  5.2). Cause: `digitalCrownRotation` moves the bound value continuously and only settles on the
+  step; sensitivity is per value unit, not per step. Fix idea: bind the crown to a step index
+  (`by: 1`) and show `index * step`. The + and - buttons should be 0.5 kg too.
+- The user wants a new watch layout (like Hevy's): a list of the workout's exercises, a tap opens the
+  exercise page; on that page the crown turns the weight directly (no editor sheet), a tap on the
+  reps tile hands the crown to reps. The crown must not flip to the next exercise.
+- iPhone Dynamic Island shows nothing. Cause: the iOS widget extension (`OpenGymWidgets`, draws
+  the Live Activity) was never added to the local project: only `ci/add-watch-app.rb` was run,
+  not `ci/add-widgets.rb` (`App.app/PlugIns` does not exist). Its `BUNDLE_ID` is still
+  `ch.opengym.app.widgets`.
