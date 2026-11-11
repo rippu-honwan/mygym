@@ -568,3 +568,18 @@ is not counted (curl: 9 of 10), moves while getting into position can count, and
 counted about a quarter of a rep into the next one.
 Fixtures (acceleration only): `reps-bench-10`, `reps-curl-10`, `reps-row-16`; WatchCore 77 tests.
 NOT yet tried on the watch.
+
+### v2 on the watch: better, slow reps missed (2026-11-11 23:15)
+
+The user: "much better, usually 1-2 short; fast reps are counted, slow ones may not be."
+Sets `2305*`/`2306*` (bench at home; `auto` == `reps` again, so no true counts in the files).
+Cause: a slow rep hardly accelerates the wrist (acceleration goes with 1/period squared), the
+velocity swing stays near the threshold (`230658_0025_s3`: peaks 0.3-0.4 m/s against 0.8-1.0
+in the fast sets). Slower filters (high-pass 1.5-2 s, leak 1.2-1.6 s) do NOT fix it: no gain on
+the slow set and the curls get worse (the watch turns, drift comes through).
+The wrist's tilt does not care about speed: v1 (gravity zigzag) counts 10 on that slow set where
+v2 counts 7. The two counters fail in opposite cases (v1: fast reps with little tilt, first
+reps; v2: slow reps). Taking the larger of the two on every scored set: home 10 10 10 9 (same as
+v2), gym a little more overcount (+1 +2 +1 +4 +2 +1 +3 where v1 or v2 alone overcounts).
+Not built: without slow sets of a known count a fusion rule cannot be chosen or checked.
+Asked the user for 2-3 slow sets (about 4 s per rep), the real count put in with the crown before Done.
