@@ -254,7 +254,19 @@ WatchCore 73. Server rebuilt from our code (`docker compose up -d --build api`):
 failed at `pod install` (the `build/` folder lost its xattr after `xcodebuild clean` recreated it;
 re-marked), but the new JS was copied before that and is inside the installed app.
 
-NOT yet verified: the real upload. Next time: the user opens MyGym on the watch (once, after the
+VERIFIED 2026-11-11 05:27 JST: the iPhone sent 5 `PUT /api/motion` (all 200), the files were in
+`data/motion/<uid>/`, the iPhone's `Documents/motion` is empty. The 5 test CSVs were then deleted
+from the server (the user approved). The user imported the Hevy history and the new plan at 12:03 (15
+workouts, week = the 4 new routines; the 4 old routines are still there, harmless) and deleted
+the 2 test workouts.
+
+Before-gym check 2026-11-11 12:20: iPhone app and watch app both 1.4.4 (54), same build as
+`build/dd-device` (embedded watch copy); profiles valid to 2026-11-16. Nothing gets installed
+before a gym day: the only known trigger of the sync loss is a reinstall. The iPhone had not
+contacted the server since 05:28, so the user must open MyGym on the iPhone at home to get the new
+schedule before leaving.
+
+Old note: the real upload was not verified at first. Next time: the user opens MyGym on the watch (once, after the
 reinstall), then on the iPhone at home; Claude checks `data/motion/<uid>/` got the 5 test CSVs
 and the iPhone's `Documents/motion` is empty, then deletes those 5 test files. The user still has to
 delete the 2 test workouts of 2026-11-11 in MyGym.
