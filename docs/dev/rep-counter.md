@@ -549,3 +549,22 @@ ones): every move while getting into position swings the velocity too. Needs a r
 (period and size like the reps before), a decision between vertical and principal axis (machine
 chest press and rows move sideways: the principal-axis variant did better there), and sets with
 true counts. Proposed to the user as v2; not built.
+
+### Counter v2: velocity (2026-11-11 23:40, built and installed)
+
+`WatchCore/RepCounter.swift` rewritten; twin `docs/dev/rep-counter-tools/counter2.py`
+(`python3 counter2.py` scores every recorded set; v1's `counter.py` is gone). userAcceleration,
+high-passed (1.0 s), leaky-integrated (0.8 s), smoothed -> velocity vector; projected on its
+main axis (running covariance, 3 s); a swing = above +th after below -th (th = 1.0 x recent RMS,
+floor 0.05 m/s); a swing counts when its size is 0.5-2.2x and its period 0.5-2.0x the median of
+the last 5; a lone first swing that the next one does not match is replaced by it.
+Scores: home (10 real reps each) 10, 10, 10, 9. Gym, 12 whole sets vs logged: 0 -3 +1 0 +2 0 +1
+0 +4 0 +1 +1 (the -3 is the doubtful 7; +4 is the 16-rep row). Sets with gaps / junk: still far
+off (+18, +21 on the 100-190 s ones).
+Tried and dropped: vertical-only velocity (worse on machine press and rows), counting a rep when
+its second lobe dies down with a "leading direction" (curl 8 of 10), "still for 0.5 s ends the
+last rep" (gym +9 in total). So the known limits stay: the LAST rep of a set that ends dead still
+is not counted (curl: 9 of 10), moves while getting into position can count, and a rep is
+counted about a quarter of a rep into the next one.
+Fixtures (acceleration only): `reps-bench-10`, `reps-curl-10`, `reps-row-16`; WatchCore 77 tests.
+NOT yet tried on the watch.

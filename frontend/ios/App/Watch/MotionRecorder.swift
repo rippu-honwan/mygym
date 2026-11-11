@@ -55,7 +55,9 @@ final class MotionRecorder {
             let s = MotionSample(t: bootAt + m.timestamp, ax: a.x, ay: a.y, az: a.z,
                                  rx: r.x, ry: r.y, rz: r.z, gx: g.x, gy: g.y, gz: g.z)
             self.samples.append(s)
-            if self.counter.push(t: s.t, gx: s.gx, gy: s.gy, gz: s.gz) {
+            let before = self.counter.reps
+            // Two at once when the counter finds that the reps changed (RepCounter.swing).
+            for _ in before..<self.counter.push(t: s.t, ax: s.ax, ay: s.ay, az: s.az) {
                 DispatchQueue.main.async { self.onRep?() }
             }
             if self.samples.count > cap { MotionLog.trim(&self.samples, now: s.t) }
