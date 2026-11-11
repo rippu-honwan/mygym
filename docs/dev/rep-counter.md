@@ -405,3 +405,27 @@ Naive count (`docs/dev/tools/first_look.py`: band-pass 0.15-1.5 Hz, peaks on wri
 
 Idea for Phase 4: lock onto the rhythm (count only once 2-3 similar cycles follow each other,
 then count those too), pick the stronger of tilt/acceleration per set, ignore lone big moves.
+
+## First real gym session (2026-11-11, Upper A, 14:09-15:34)
+
+Data: 19 motion CSVs reached the server by themselves (2b works end to end), 23 sets ticked, heart
+rate on every set (the workout session ran). Usable for Phase 4: 18 files. Not usable:
+`145828_0031_s2` (0.5 s: the app had crashed during the set, the user pressed Start then Done after
+reopening); `0025` set 1 has no file. Gaps of 3-9 s inside `141458_0577_s2`, `143627_0047_s1`,
+`144103_0047_s2` (app not running for a moment; re-check after the crash fix).
+
+### Problem: the watch app closed again and again (ROOT CAUSE FOUND)
+
+20 crash reports of 14:14-15:26 on the iPhone (`devicectl device info files --domain-type
+systemCrashLogs`, folder `ProxiedDevice-*/OpenGymWatch-*.ips`), all the same: EXC_BREAKPOINT on
+the main thread at `OpenGymWatchApp.swift:1012`, RestView:
+`Text(timerInterval: Date()...end, countsDown: true)`. A range whose end lies in the past traps.
+It happens when the view is drawn again after the rest ran out and before the rest timer cleared
+`restEndsAt` (the timer is late when the wrist was down); each crash is 3-21 s after a rest's end
+(set time + 90 s). Upstream code, not ours. The same pattern is at line 1071 (hold countdown).
+Symbolicated with `atos -o .../OpenGymWatch.app/OpenGymWatch.debug.dylib -arch arm64 -l <base>`.
+
+The user's requests after the session: (1) app must stay open until Finish, (2) no rest after the
+last set of an exercise, straight to the next one, (3) crown: weight in 0.5 kg steps (his cable
+stacks are 3.5 / 6.5 / 8.5 / 13.5 / 47.5, not on the 2.5 grid the editor snaps to), smoother.
+Plan proposed 2026-11-11, waiting for the user's approval.
