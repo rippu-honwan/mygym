@@ -375,3 +375,33 @@ only came at 23:20 when MyGym was open in the foreground. Sync needs the app ope
    tick one set on the watch and see it on the phone.
 
 Report back: which steps worked, the exact error text and a screenshot for any that did not.
+
+## First gym session (2026-11-11, Upper A, workout `mwbntd487xjt8`)
+
+Phone and watch stayed in sync at the gym (every CSV carries the phone's workout id). At home the
+iPhone uploaded 19 CSVs in one go (17:20 JST); they are in `data/motion/<uid>/`, 8 exercises.
+Ground truth = `r` of the set on the server (the user corrected some after Done: the CSV's `reps` is
+only the value at the moment of Done, e.g. chest press s2 10 -> 11, s3 10 -> 7).
+
+Data problems found:
+- Gaps inside 5 sets, all between 14:14 and 14:47: chest press s2 9.3 s, incline bench s1 3.8 s +
+  4.5 s, incline s2 2.8 s, chest press s3 and lateral raise s1 0.1-0.4 s. The other 14 sets have
+  none (max 0.03 s). Cause NOT known yet. A 9 s gap loses about 3 reps, so this must be understood
+  before the live count. To check: is the app throttled in the background, and would
+  `CMBatchedSensorManager` (made for workouts) be the sturdier source.
+- Long windows: bench s3 193 s, curl s3 126 s, lat pulldown s1 104 s. In curl s3 the 6 reps are
+  clear in the first 25 s, the rest is noise: Done was pressed late.
+- Curl s2 is 0.5 s long (Start and Done right after each other). Bench s1 has no file (ticked on
+  the phone). Incline s2 does not join: the server's `at` is 37 s later than the CSV's `end`
+  (integer `at` = re-ticked on the phone).
+
+Naive count (`docs/dev/tools/first_look.py`: band-pass 0.15-1.5 Hz, peaks on wrist tilt): exact in
+2 of 18 sets, within 1 in 4 of 18. Not usable, as expected. What the plot shows:
+- The reps are clearly visible in lateral raise, curl, chest press, triceps extension, row s1.
+- The naive count is too high mostly because of the moves before the first and after the last rep
+  (lifting off, racking) and the long idle tails.
+- Seated row s2/s3: the wrist hardly tilts; the reps show in acceleration, not in tilt. So the
+  signal has to be chosen per set, not fixed.
+
+Idea for Phase 4: lock onto the rhythm (count only once 2-3 similar cycles follow each other,
+then count those too), pick the stronger of tilt/acceleration per set, ignore lone big moves.
