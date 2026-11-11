@@ -428,4 +428,20 @@ Symbolicated with `atos -o .../OpenGymWatch.app/OpenGymWatch.debug.dylib -arch a
 The user's requests after the session: (1) app must stay open until Finish, (2) no rest after the
 last set of an exercise, straight to the next one, (3) crown: weight in 0.5 kg steps (his cable
 stacks are 3.5 / 6.5 / 8.5 / 13.5 / 47.5, not on the 2.5 grid the editor snaps to), smoother.
-Plan proposed 2026-11-11, waiting for the user's approval.
+The user approved. Done 2026-11-11 (commit "fix: watch crash at rest end, no rest after last set,
+0.5 kg crown"):
+- Crash: the range is `min(Date(), end)...end` in RestView and the hold countdown.
+- Rest: only between the sets of one exercise. Phone `restAfterSet` (`lib/supersetFlow.js`) is
+  `!unitDone`, and no rest after a superset's last round (`views/Workout.jsx`); watch
+  `SessionCore.next` returns `rest: false` when it moves to another exercise. The phone rule
+  matters for watch ticks too: a watch tick runs the phone's action, and the phone's rest comes
+  back in the snapshot. 14 upstream phone tests changed to the new rule; one skipped
+  (`Workout.auto-holds`: moving on to the next TIMED exercise rode on that rest ending; the user has
+  no timed exercise, rebuild it if he adds one).
+- Crown (weight editor): 0.5 kg per step (1 lb), sensitivity `.high` for weight and `.medium`
+  for reps (was medium / low): a first guess, tune by the user's feel. The + and - buttons keep the
+  exercise's step (2.5 kg) and no longer snap to its grid (8.5 + 2.5 = 11).
+Checked: WatchCore 74 tests, frontend 7835 (1 skipped, only the known local `app-icons`
+failure). Built and installed 17:41: iPhone app, then the embedded watch app.
+NOT yet verified on the devices: sync after this reinstall, a rest running out with the wrist
+down, no rest after a last set, the crown's feel.
