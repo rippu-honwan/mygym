@@ -113,7 +113,7 @@ struct RootView: View {
             Button("Continue workout", role: .cancel) { store.keepGoing() }
             Button("Finish workout") {
                 store.keepGoing()
-                store.show(entry: store.workout?.entries.count ?? 0)
+                store.open(entry: store.workout?.entries.count ?? 0)
             }
         }
         // Any touch: the rest-over alarm was noticed (it would tap once more otherwise).
@@ -332,18 +332,161 @@ struct IdleView: View {
 
 /* ---------- the exercises, one per page ---------- */
 
+/// MyGym (docs/dev/rep-counter.md): the workout is a list of its exercises; a tap opens one. On
+/// its page the crown turns the numbers and never moves to another exercise (upstream: vertical
+/// pages, the crown paging through them).
 struct ExercisePager: View {
     @EnvironmentObject var store: SessionStore
 
     var body: some View {
-        // Vertical pages, swiped; the crown belongs to the numbers on the page (like a volume).
-        TabView(selection: Binding(get: { store.entryIndex }, set: { store.show(entry: $0) })) {
-            ForEach(Array((store.workout?.entries ?? []).enumerated()), id: \.offset) { pair in
-                ExercisePage(index: pair.offset).tag(pair.offset)
+        let count = store.workout?.entries.count ?? 0
+        Group {
+            if store.browsing {
+                ExerciseList()
+            } else if store.entryIndex >= count {
+                FinishPage()
+            } else {
+                // A page of its own per exercise: the crown starts on the weight again.
+                ExercisePage(index: store.entryIndex).id(store.entryIndex)
             }
-            FinishPage().tag(store.workout?.entries.count ?? 0)
         }
-        .tabViewStyle(.verticalPage)
+        // Another workout: its list first.
+        .onChange(of: store.workout?.id) { _ in if !store.isDemo { store.browsing = true } }
+    }
+}
+
+/// The workout's exercises with their sets done, the one up next marked; Finish at the end.
+struct ExerciseList: View {
+    @EnvironmentObject var store: SessionStore
+
+    var body: some View {
+        let entries = store.workout?.entries ?? []
+        ScrollViewReader { reader in
+            List {
+                Section {
+                    ForEach(Array(entries.enumerated()), id: \.offset) { pair in
+                        let done = pair.element.sets.filter { $0.done }.count
+                        let all = done == pair.element.sets.count
+                        Button { store.open(entry: pair.offset) } label: {
+                            HStack(spacing: 6) {
+                                Text(pair.element.name)
+                                    .font(.system(.footnote, design: .rounded).weight(.semibold))
+                                    .lineLimit(2)
+                                    .minimumScaleFactor(0.8)
+                                Spacer(minLength: 2)
+                                if all {
+                                    Image(systemName: "checkmark").font(.caption2.weight(.bold)).accessibilityHidden(true)
+                                } else {
+                                    Text(verbatim: "\(done)/\(pair.element.sets.count)").font(.caption2.monospacedDigit())
+                                }
+                            }
+                            .foregroundStyle(all ? Color.secondary : Color.white)
+                        }
+                        .listRowBackground(RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(pair.offset == store.entryIndex && !all ? Theme.accent.opacity(0.35) : Theme.dim))
+                        .id(pair.offset)
+                    }
+                    Button { store.open(entry: entries.count) } label: {
+                        Label { Text("Finish workout") } icon: { Image(systemName: "flag.checkered") }
+                            .font(.system(.footnote, design: .rounded).weight(.semibold))
+                    }
+                } header: {
+                    Text(verbatim: store.workout?.name ?? "")
+                }
+            }
+            .onAppear { reader.scrollTo(store.entryIndex, anchor: .center) }
+        }
+    }
+}
+
+/// The weight's step on the watch (MyGym): 0.5 kg (1 lb) on the crown and on − and +, fine enough
+/// for any cable stack (3.5, 6.5, 8.5 kg).
+func weightStep(_ unit: String) -> Double { unit == "lb" ? 1 : 0.5 }
+
+/// − or +, a round button beside a number or beside Done.
+struct StepButton: View {
+    let symbol: String
+    let label: Text
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 18, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(width: 40, height: 40)
+                .background(Circle().fill(Theme.dim))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
+    }
+}
+
+/*
+ * A number the Digital Crown turns right on the exercise page (MyGym): the tile in focus has the
+ * accent outline, a tap hands the crown to the other one. The crown counts steps in `raw`, which
+ * SwiftUI moves smoothly between two; the value only ever takes a whole step, so no 5.1 shows on
+ * the way from 5 to 6.
+ */
+struct CrownTile<Field: Hashable>: View {
+    @Binding var value: Double
+    let step: Double
+    let upper: Double
+    let unit: String?
+    let label: Text
+    var tint: Color = .white
+    var large = false
+    let field: Field
+    let focus: FocusState<Field?>.Binding
+    @State private var raw: Double = 0
+    @ScaledMetric(relativeTo: .largeTitle) private var size: CGFloat = 34
+    @ScaledMetric(relativeTo: .largeTitle) private var largeSize: CGFloat = 42
+    @Environment(\.isLuminanceReduced) private var dimmed
+    // ponytail: how far the crown turns per step is a guess until the user has felt it (.low: the
+    // most turning per step, as upstream's reps editor).
+    static var sensitivity: DigitalCrownRotationalSensitivity { .low }
+
+    var body: some View {
+        let on = focus.wrappedValue == field && !dimmed
+        VStack(spacing: 0) {
+            HStack(alignment: .firstTextBaseline, spacing: 2) {
+                Text(verbatim: formatNumber(value))
+                    .font(.system(size: large ? largeSize : size, weight: .semibold, design: .rounded).monospacedDigit())
+                if let u = unit {
+                    Text(verbatim: u).font(.system(size: 12, weight: .medium, design: .rounded)).foregroundStyle(.secondary)
+                }
+            }
+            .lineLimit(1)
+            .minimumScaleFactor(0.5)
+            label.font(.system(size: 10, weight: .medium)).foregroundStyle(.secondary).lineLimit(1)
+                .dynamicTypeSize(...DynamicTypeSize.large)
+        }
+        .foregroundStyle(tint.opacity(dimmed ? 0.7 : 1))
+        .frame(maxWidth: .infinity, minHeight: Theme.tap)
+        .padding(.vertical, 3)
+        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(dimmed ? Color.clear : Theme.dim))
+        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
+            .stroke(on ? Theme.accent : Theme.dim, lineWidth: on ? 2 : (dimmed ? 1 : 0)))
+        .contentShape(Rectangle())
+        .focusable()
+        .focused(focus, equals: field)
+        .digitalCrownRotation($raw, from: 0, through: upper / step, by: 1,
+                              sensitivity: CrownTile.sensitivity, isContinuous: false, isHapticFeedbackEnabled: true)
+        .onTapGesture { focus.wrappedValue = field }
+        .onAppear { raw = value / step }
+        // Only a whole step moves the value: one off the grid (16.25) stays until the crown turns.
+        .onChange(of: raw) { r in if r.rounded() != (value / step).rounded() { value = r.rounded() * step } }
+        .onChange(of: value) { v in if raw.rounded() != (v / step).rounded() { raw = v / step } }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(label)
+        .accessibilityValue(Text(verbatim: unit.map { "\(formatNumber(value)) \($0)" } ?? formatNumber(value)))
+        .accessibilityAdjustableAction { d in
+            switch d {
+            case .increment: value += step
+            case .decrement: value = max(0, value - step)
+            @unknown default: break
+            }
+        }
     }
 }
 
@@ -364,6 +507,9 @@ struct ExercisePage: View {
     let index: Int
     @State private var editing: EditField?
     @State private var confirmSkip = false
+    /// The number the crown turns (MyGym): the weight first, a tap on Reps hands it over.
+    enum Crown: Hashable { case weight, reps }
+    @FocusState private var crown: Crown?
     @Environment(\.dynamicTypeSize) private var typeSize
     @ScaledMetric(relativeTo: .title) private var doneSizeScaled: CGFloat = 58
     /// Large enough to hit, small enough to leave room for the numbers at the largest text sizes.
@@ -425,6 +571,7 @@ struct ExercisePage: View {
             // that still fits on 41 mm; the start screen and the summary scroll and grow all the way.
             .dynamicTypeSize(...DynamicTypeSize.accessibility1)
             .onAppear {
+                crown = entry.isBodyweight ? .reps : .weight
                 if current, SessionStore.demoScreen == "edit-weight" { editing = .weight }
                 if current, SessionStore.demoScreen == "edit-reps" { editing = .reps }
             }
@@ -440,13 +587,13 @@ struct ExercisePage: View {
 
     /// Weight × reps as two tiles; a bodyweight set: the reps big, the added weight small.
     @ViewBuilder private func numbers(_ entry: Entry, _ row: SetRow, unit: String, current: Bool) -> some View {
-        let side = row.sideUp.flatMap { row.sides?[$0] }
-        let weight = current ? store.weight : (side?.w ?? row.w ?? 0)
-        let reps = current ? store.reps : (side?.r ?? row.r ?? 0)
+        // MyGym: only the exercise up is on screen (ExercisePager), so the numbers are the store's.
+        let weight = store.weight
         let tint = row.warmup ? Theme.warmup : Color.white
         if entry.isBodyweight {
             VStack(spacing: 3) {
-                ValueTile(value: formatNumber(reps), unit: nil, label: Text("Reps"), tint: tint, large: true) { if current { editing = .reps } }
+                CrownTile(value: $store.reps, step: 1, upper: 200, unit: nil, label: Text("Reps"), tint: tint, large: true,
+                          field: Crown.reps, focus: $crown)
                 Button { if current { editing = .weight } } label: {
                     Group {
                         if weight > 0 { Text(verbatim: "+\(formatNumber(weight)) \(unit)") } else { Text("Bodyweight") }
@@ -463,14 +610,25 @@ struct ExercisePage: View {
             }
         } else {
             HStack(spacing: 6) {
-                ValueTile(value: formatNumber(weight), unit: unit, label: Text("Weight"), tint: tint) { if current { editing = .weight } }
-                ValueTile(value: formatNumber(reps), unit: nil, label: Text("Reps"), tint: tint) { if current { editing = .reps } }
+                CrownTile(value: $store.weight, step: weightStep(unit), upper: unit == "lb" ? 1500 : 700, unit: unit,
+                          label: Text("Weight"), tint: tint, field: Crown.weight, focus: $crown)
+                CrownTile(value: $store.reps, step: 1, upper: 200, unit: nil, label: Text("Reps"), tint: tint,
+                          field: Crown.reps, focus: $crown)
             }
         }
     }
 
     @ViewBuilder private func header(_ entry: Entry) -> some View {
         HStack(alignment: .top, spacing: 6) {
+            // MyGym: back to the list of exercises.
+            Button { store.browsing = true } label: {
+                Image(systemName: "list.bullet")
+                    .font(.system(size: 12, weight: .bold))
+                    .frame(width: 28, height: 28)
+                    .background(Circle().fill(Theme.dim))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Text("Exercises"))
             if store.show.showClip, let clip = store.clips[entry.id] {
                 ClipView(clip: clip, animating: index == store.entryIndex).frame(width: 30, height: 30)
             }
@@ -516,9 +674,26 @@ struct ExercisePage: View {
                 doneButton(entry, current: current)
                 Color.clear.frame(width: Theme.tap, height: Theme.tap).accessibilityHidden(true)
             }
-        } else {
+        } else if entry.isTimed || entry.isCardio {
             doneButton(entry, current: current)
+        } else {
+            // MyGym: − and + for the number the crown is on, either side of Start set / Done.
+            HStack(spacing: 8) {
+                StepButton(symbol: "minus", label: Text("Less")) { nudge(-1, entry) }
+                doneButton(entry, current: current)
+                StepButton(symbol: "plus", label: Text("More")) { nudge(1, entry) }
+            }
         }
+    }
+
+    private func nudge(_ d: Double, _ entry: Entry) {
+        if (crown ?? (entry.isBodyweight ? .reps : .weight)) == .reps {
+            store.reps = max(0, store.reps + d)
+        } else {
+            let s = weightStep(entry.weightUnit(store.unit))
+            store.weight = max(0, ((store.weight + d * s) / s).rounded() * s)
+        }
+        WKInterfaceDevice.current().play(.click)
     }
 
     @ViewBuilder private func doneButton(_ entry: Entry, current: Bool) -> some View {
@@ -690,11 +865,10 @@ struct ValueEditor: View {
         case .seconds: return 5
         }
     }
-    /// The crown's step. MyGym: a weight turns in 0.5 kg (1 lb), fine enough for any cable stack
-    /// (3.5, 6.5, 8.5 kg), while the buttons jump the exercise's step.
-    private var crownStep: Double { field == .weight ? (unit == "lb" ? 1 : 0.5) : step }
-    // ponytail: first guess without the watch in hand; the user tunes it by feel.
-    private var crownSensitivity: DigitalCrownRotationalSensitivity { field == .weight ? .high : .medium }
+    /// The crown's and the buttons' step. MyGym: a weight moves in 0.5 kg (weightStep).
+    private var crownStep: Double { field == .weight ? weightStep(unit) : step }
+    /// What shows and what is saved: the crown's value on its step (it glides between two).
+    private var snapped: Double { (value / crownStep).rounded() * crownStep }
     private var range: ClosedRange<Double> {
         switch field {
         case .weight: return 0...(unit == "lb" ? 1500 : 700)
@@ -720,7 +894,7 @@ struct ValueEditor: View {
     }
     /// What the big number says: the value, or for effort the rating at the crown (a dash: none).
     private var shown: String {
-        guard field == .effort else { return formatNumber(value) }
+        guard field == .effort else { return formatNumber(snapped) }
         return Effort.value(kind, at: Int(value.rounded())).map(formatNumber) ?? "–"
     }
     private var shownColor: Color {
@@ -732,7 +906,7 @@ struct ValueEditor: View {
         VStack(spacing: 4) {
             title.font(.caption.weight(.semibold)).foregroundStyle(.secondary)
             HStack(spacing: 6) {
-                stepButton("minus", Text("Less")) { nudge(-step) }
+                StepButton(symbol: "minus", label: Text("Less")) { nudge(-crownStep) }
                 VStack(spacing: 0) {
                     HStack(alignment: .firstTextBaseline, spacing: 2) {
                         Text(verbatim: shown)
@@ -750,18 +924,18 @@ struct ValueEditor: View {
                 .focusable()
                 .focused($focused)
                 .digitalCrownRotation($value, from: range.lowerBound, through: range.upperBound, by: crownStep,
-                                      sensitivity: crownSensitivity, isContinuous: false, isHapticFeedbackEnabled: true)
+                                      sensitivity: .low, isContinuous: false, isHapticFeedbackEnabled: true)
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(title)
                 .accessibilityValue(field == .effort && shown == "–" ? Text("None") : Text(verbatim: suffix.map { "\(shown) \($0)" } ?? shown))
                 .accessibilityAdjustableAction { d in
                     switch d {
-                    case .increment: nudge(step)
-                    case .decrement: nudge(-step)
+                    case .increment: nudge(crownStep)
+                    case .decrement: nudge(-crownStep)
                     @unknown default: break
                     }
                 }
-                stepButton("plus", Text("More")) { nudge(step) }
+                StepButton(symbol: "plus", label: Text("More")) { nudge(crownStep) }
             }
             if field == .weight {
                 Text(verbatim: "± \(formatNumber(crownStep)) \(unit)").font(.system(size: 10)).foregroundStyle(.secondary)
@@ -799,23 +973,11 @@ struct ValueEditor: View {
 
     private func save() {
         switch field {
-        case .weight: store.weight = max(0, value)
+        case .weight: store.weight = max(0, snapped)
         case .reps: store.reps = max(0, value.rounded())
-        case .seconds: store.seconds = max(5, value)
+        case .seconds: store.seconds = max(5, snapped)
         case .effort: store.rate(Effort.value(kind, at: Int(value.rounded())))
         }
-    }
-
-    private func stepButton(_ symbol: String, _ label: Text, _ action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: symbol)
-                .font(.system(size: 18, weight: .bold))
-                .foregroundStyle(.white)
-                .frame(width: 40, height: 40)
-                .background(Circle().fill(Theme.dim))
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(label)
     }
 }
 
@@ -955,6 +1117,9 @@ struct FinishPage: View {
                 .lineLimit(2)
                 .multilineTextAlignment(.center)
             RoundButton(systemImage: "flag.checkered", label: Text("Finish workout")) { confirming = true }
+            // MyGym: back to the list of exercises.
+            Button { store.browsing = true } label: { Image(systemName: "list.bullet") }
+                .accessibilityLabel(Text("Exercises"))
             let p = store.progress
             if p.total > 0 {
                 Text("\(p.done) of \(p.total) sets").font(.caption2).foregroundStyle(.secondary)

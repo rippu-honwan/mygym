@@ -284,6 +284,17 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
         if ei == entryIndex { loadTargets() }
     }
 
+    /// MyGym: the list of exercises is up, not one exercise's page (ExercisePager). The demo
+    /// screens CI photographs are single pages, except "list".
+    @Published var browsing = SessionStore.demoScreen == "list"
+        || !ProcessInfo.processInfo.arguments.contains(SessionStore.demoArgument)
+
+    /// A tap on an exercise in the list (or on its Finish): that page.
+    func open(entry ei: Int) {
+        show(entry: ei)
+        browsing = false
+    }
+
     /// Paging to another exercise (a vertical swipe).
     func show(entry ei: Int) {
         guard ei != state.entryIndex else { return }

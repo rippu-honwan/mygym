@@ -29,6 +29,7 @@ const FROM_APP = {
   'Rest': 'Rest',
   'Skip': 'Skip',
   'Finish workout': 'Finish workout',
+  'Exercises': 'Exercises',
   'Finish workout?': 'Finish workout?',
   'Finish and save': 'Finish and save',
   'Discard workout': 'Discard workout',
