@@ -511,3 +511,19 @@ Installed the iPhone app, then the embedded watch app, both at the first try. On
 now: crown by steps, exercise list + in-place editing, live rep count, Dynamic Island extension.
 NOT yet verified by the user: all four, and sync after this reinstall (he has to open the watch app
 by hand once).
+
+### The user's test of the live count build (2026-11-11 22:30) and the fixes installed 22:45
+
+Works: Dynamic Island, the taps on the wrist are felt, sync after the reinstall.
+Counter: "sometimes 1-2 too many, sometimes 4 too few". The 5 test sets (bench / incline, at
+home) logged exactly what the counter said (`auto` == `reps`: goal 8 -> 12, 11, 12; goal 10 ->
+11, 6), so there is NO true count in the data to tune against. Replay matches the watch. Not
+changed blind: the user has to put the real number in before Done.
+Fixed and installed (commit "fix: watch list taps, rolling digits, rest overtime, no lock button"):
+- List taps took 2-3 s and Finish did nothing: SwiftUI List rows under RootView's tap gesture.
+  Now plain buttons in a ScrollView. (Cause is my best reading; not proven on the device.)
+- Digits roll (`contentTransition(.numericText)`); Start set moves the crown to the reps.
+- Rest over: 4 x `.notification` (about 1.5 s; no single long vibration exists for an app),
+  then `restOverSince` shows "-0:07" in red on the exercise page until Start set / Done.
+- Water lock button removed from rest, hold and finish pages.
+NOT yet verified by the user.
