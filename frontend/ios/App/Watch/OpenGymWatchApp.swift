@@ -361,9 +361,15 @@ struct ExerciseList: View {
 
     var body: some View {
         let entries = store.workout?.entries ?? []
+        // Plain buttons in a ScrollView, not a List: on the watch a List row swallowed taps for
+        // seconds under RootView's tap gesture (the user, 2026-11-11), Finish did nothing at all.
         ScrollViewReader { reader in
-            List {
-                Section {
+            ScrollView {
+                VStack(spacing: 4) {
+                    Text(verbatim: store.workout?.name ?? "")
+                        .font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 6)
                     ForEach(Array(entries.enumerated()), id: \.offset) { pair in
                         let done = pair.element.sets.filter { $0.done }.count
                         let all = done == pair.element.sets.count
@@ -373,6 +379,7 @@ struct ExerciseList: View {
                                     .font(.system(.footnote, design: .rounded).weight(.semibold))
                                     .lineLimit(2)
                                     .minimumScaleFactor(0.8)
+                                    .multilineTextAlignment(.leading)
                                 Spacer(minLength: 2)
                                 if all {
                                     Image(systemName: "checkmark").font(.caption2.weight(.bold)).accessibilityHidden(true)
@@ -381,17 +388,24 @@ struct ExerciseList: View {
                                 }
                             }
                             .foregroundStyle(all ? Color.secondary : Color.white)
+                            .padding(.horizontal, 10)
+                            .frame(maxWidth: .infinity, minHeight: Theme.tap)
+                            .background(RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .fill(pair.offset == store.entryIndex && !all ? Theme.accent.opacity(0.35) : Theme.dim))
+                            .contentShape(Rectangle())
                         }
-                        .listRowBackground(RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(pair.offset == store.entryIndex && !all ? Theme.accent.opacity(0.35) : Theme.dim))
+                        .buttonStyle(.plain)
                         .id(pair.offset)
                     }
                     Button { store.open(entry: entries.count) } label: {
                         Label { Text("Finish workout") } icon: { Image(systemName: "flag.checkered") }
                             .font(.system(.footnote, design: .rounded).weight(.semibold))
+                            .padding(.horizontal, 10)
+                            .frame(maxWidth: .infinity, minHeight: Theme.tap)
+                            .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Theme.dim))
+                            .contentShape(Rectangle())
                     }
-                } header: {
-                    Text(verbatim: store.workout?.name ?? "")
+                    .buttonStyle(.plain)
                 }
             }
             .onAppear { reader.scrollTo(store.entryIndex, anchor: .center) }
@@ -452,6 +466,9 @@ struct CrownTile<Field: Hashable>: View {
             HStack(alignment: .firstTextBaseline, spacing: 2) {
                 Text(verbatim: formatNumber(value))
                     .font(.system(size: large ? largeSize : size, weight: .semibold, design: .rounded).monospacedDigit())
+                    // The digits roll up or down like a wheel as the number changes.
+                    .contentTransition(.numericText(value: value))
+                    .animation(.snappy(duration: 0.2), value: value)
                 if let u = unit {
                     Text(verbatim: u).font(.system(size: 12, weight: .medium, design: .rounded)).foregroundStyle(.secondary)
                 }
@@ -538,7 +555,13 @@ struct ExercisePage: View {
                     } else {
                         numbers(entry, row, unit: entry.weightUnit(w.unit), current: current)
                     }
-                    if store.show.showLast, let last = entry.last, !last.isEmpty {
+                    if let over = store.restOverSince {
+                        // MyGym: the rest ran out and the next set has not started: how long ago, in red.
+                        (Text(verbatim: "-") + Text(timerInterval: over...Date.distantFuture, countsDown: false))
+                            .font(.system(size: 13, weight: .semibold, design: .rounded).monospacedDigit())
+                            .foregroundStyle(.red)
+                            .padding(.top, 1)
+                    } else if store.show.showLast, let last = entry.last, !last.isEmpty {
                         Text("Last time: \(last)")
                             .font(.system(size: 11))
                             .foregroundStyle(.secondary)
@@ -575,6 +598,8 @@ struct ExercisePage: View {
                 if current, SessionStore.demoScreen == "edit-weight" { editing = .weight }
                 if current, SessionStore.demoScreen == "edit-reps" { editing = .reps }
             }
+            // Counting: the crown is on the reps, to put the count right without a tap first.
+            .onChange(of: store.recordingSince != nil) { on in if on { crown = .reps } }
             .sheet(item: $editing) { field in
                 ValueEditor(field: field, entry: entry, unit: entry.weightUnit(w.unit))
             }
@@ -1133,7 +1158,6 @@ struct FinishPage: View {
             if store.offline {
                 Text("Saved on the watch, syncs later").font(.caption2).foregroundStyle(.secondary).multilineTextAlignment(.center)
             }
-            LockButton(health: store.health)
         }
         .padding(.horizontal, 6)
         .dynamicTypeSize(...DynamicTypeSize.accessibility2)
@@ -1222,8 +1246,6 @@ struct RestView: View {
             HStack {
                 EdgeButton(systemImage: "goforward.15", label: Text("+15s")) { store.addRest(15) }
                 Spacer()
-                LockButton(health: store.health)
-                Spacer()
                 EdgeButton(systemImage: "forward.end.fill", label: Text("Skip")) { store.skipRestAndGo() }
             }
             .opacity(dimmed ? 0 : 1)
@@ -1258,7 +1280,6 @@ struct HoldView: View {
             .aspectRatio(1, contentMode: .fit)
             .padding(.horizontal, 6)
             HStack {
-                LockButton(health: store.health)
                 Spacer()
                 EdgeButton(systemImage: "stop.fill", label: Text("Stop")) { store.endHold(early: true) }
             }

@@ -263,6 +263,7 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
     /// Start set: the rest (if any) ends here and the sensor records until Done.
     func startSet() {
         guard recordingSince == nil, let e = entry, setIndex != nil, recordsMotion(e) else { return }
+        restOverSince = nil
         if restEndsAt != nil { skipRest() }
         ackRestOver()
         noteActivity()
@@ -322,6 +323,7 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
     func show(entry ei: Int) {
         guard ei != state.entryIndex else { return }
         stopRecording()
+        restOverSince = nil
         ackRestOver()
         state.entryIndex = ei
         touchLock.unlock()          // swiped by hand: the page is the lifter's own choice
@@ -487,6 +489,7 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
         // In a superset the page flips to the partner: a slower second tap would log its set.
         if heldFor == nil, !touchAllowed { return }
         lastTick = Date()
+        restOverSince = nil
         ackRestOver()
         let ei = entryIndex
         let now = Date()
@@ -952,7 +955,12 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
     /// The rest as a timer here (with the app in front: the haptic pattern) and as a notification
     /// for its end (with the app not in front: banner and haptic from the system). A new rest or a
     /// skip takes the old one back.
+    /// MyGym: when the rest ran out by itself, until the next set starts (the page shows how long
+    /// ago in red). A skipped rest sets none.
+    @Published private(set) var restOverSince: Date?
+
     private func startRest(until end: Date, notify: Bool) {
+        restOverSince = nil
         restTimer?.invalidate()
         let center = UNUserNotificationCenter.current()
         center.removePendingNotificationRequests(withIdentifiers: [SessionStore.restNotificationId])
@@ -967,6 +975,7 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
                 self?.closeRest(at: Date())
                 self?.restEndsAt = nil
                 self?.restStartedAt = nil
+                self?.restOverSince = end
                 self?.autoHoldIfDue()
             }
         }
@@ -1237,7 +1246,9 @@ enum Haptics {
     }
     static func done() { play([(0, .success)]) }
     static func side() { play([(0, .click)]) }
-    static func restOver() { play([(0, .notification), (0.45, .notification), (0.9, .directionUp)]) }
+    // MyGym: about 1.5 s of buzzing. The watch has no one long vibration for an app, only its
+    // fixed taps, so the strongest one is played in a row.
+    static func restOver() { play([(0, .notification), (0.4, .notification), (0.8, .notification), (1.2, .notification)]) }
     static func start() { play([(0, .start)]) }
     static func finished() { play([(0, .stop), (0.5, .success), (0.9, .success)]) }
     static func skip() { play([(0, .directionDown)]) }
