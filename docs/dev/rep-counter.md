@@ -678,3 +678,32 @@ these curves; then a phone setting and the watch's "ready" tap.
   3 highest moments with what was on. Checked with made-up readings only; old workouts have none.
   Needs Apple Health on (no session, no readings).
   The user confirmed sync after this install (2026-11-13).
+
+## Remaining features: design (2026-11-13, nothing built)
+
+Paths found in the code:
+- Settings reach the watch as `WatchSettings` (WatchCore `Model.swift`), filled from the phone's
+  per-device prefs (`lib/watch-settings.js`, edited in `views/WatchSettings.jsx`) in every
+  snapshot. New choices go there: one "Rep counter" group.
+- A tick from the watch is stored by the phone with only known fields (`watch-sync.js extraOf`:
+  sec, side, rpe/rir). A new per-set field needs adding there and in the event (`SessionCore.tick`).
+- Effort (RPE/RIR) is logged and shown but `progression.js` does not use it.
+
+1. Velocity per set (base for 2, 4): `RepCounter` keeps each counted swing's size; at Done the
+   event gets `vel: {best, last, loss}` (best of the first 3, mean of the last 2, 1 - last/best),
+   only when the speed counter (not tilt) gave the count; phone `extraOf` keeps it on the set.
+   Build now so history starts to build up.
+2. Fatigue alert (setting: off / 20 / 30 / 40 % loss, default off): during a set, a rep whose
+   swing is that much below `best` plays `.retry` once per set; a rep taking > 2x the median rep
+   time plays it too (a grind). Watch only.
+3. Auto-end set (setting off by default): after >= 1 rep, acceleration RMS under a floor for 4 s
+   -> the Done button shows a 3 s countdown ring; a tap anywhere cancels; then Done with the count.
+   Not during the first 3 s after Start set. Watch only (`SessionStore`, `MotionRecorder` gives
+   a stillness flag from the same samples).
+4. Heart-rate rest (setting: off / "-20 bpm" style drop, min 45 s, max = the rest timer): when
+   HR is at least the drop below the high since Done, the rest screen turns green and taps once;
+   overtime then counts as now. Thresholds from the next gym session's `hrCurve` data.
+5. Weight suggestion (last): `nextPrescription` for reps policies reads the last session's `vel`
+   for the exercise: target reps met and loss < low threshold (fresh) -> raise as the policy does
+   now, even a double-progression one that would wait; loss > high threshold -> hold the weight.
+   Thresholds per profile setting; needs weeks of `vel` data and a unit test (CONTRIBUTING rule).
