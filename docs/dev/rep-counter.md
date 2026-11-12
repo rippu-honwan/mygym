@@ -765,3 +765,10 @@ Causes and fixes (installed):
   must be tried at the gym; deliberately slow reps are not the same signal.
 - Each set file now has `helpers: {fatigue, autoEnd, log: [[s, "autoEndRing"|"autoEndRep"|
   "autoEndTap"|"autoEnd"|"fatigue"], ...]}` to see on the Mac what the watch did.
+- Debug log (2026-11-13, installed): the set file's `helpers.log` now has every counted rep
+  `[s, "rep N speed|tilt|both"]` (sample time, which counter saw it first), every hand change of
+  the reps while counting `"edit 8>10"` (crown, - / +), `"done"` or `"autoEnd"`, plus the
+  auto-end and fatigue events. `data/reports/debug.html` (linked from the index): every set
+  over 3 s, worst difference first, watch count vs reps at Done vs reps logged on the server
+  (the iPhone may change them later), and a timeline: velocity, tilt, the watch's reps by
+  source, edits, the end, and the Mac replay's reps of today's code.

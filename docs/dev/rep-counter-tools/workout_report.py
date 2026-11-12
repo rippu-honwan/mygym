@@ -280,6 +280,8 @@ thead th{font-size:12px;color:var(--dim);font-weight:500}tr.ex th{padding-top:18
 .prev{display:block;font-weight:400;font-size:12px;color:var(--dim)}.off{color:var(--off)}
 .bars rect{fill:var(--accent)}h2{font-size:17px;margin:22px 0 8px}
 svg.hr{width:100%;height:180px;display:block}svg.hr polyline{fill:none;stroke:#ff375f;stroke-width:1.5;vector-effect:non-scaling-stroke}
+svg.hr .set{fill:var(--line)}svg.dbg{width:100%;height:150px;display:block;border:1px solid var(--line);border-radius:8px;font-size:10px}
+svg.dbg .vl{fill:none;stroke:#ff375f;stroke-width:1;vector-effect:non-scaling-stroke}svg.dbg .tl{fill:none;stroke:#0a84ff;stroke-opacity:.5;stroke-width:1;vector-effect:non-scaling-stroke}
 svg.hr .set{fill:var(--line)}svg.hr .grid{stroke:var(--line);vector-effect:non-scaling-stroke}svg.hr text{fill:var(--dim);font-size:11px}a{color:inherit}.wrap{overflow-x:auto}
 """
 
@@ -376,6 +378,61 @@ def weekly(week, n, prev, earlier_speed):
     return page(f"Week {week}", out)
 
 
+def debug_timeline(meta, a):
+    """One set as a picture: the speed counter's velocity (red) and the wrist's tilt (blue), the
+    watch's reps as it counted them (from the set file's log: green speed, blue tilt, purple both),
+    hand edits (orange) and the end (grey), and today's code's reps on the Mac (black ticks below)."""
+    c = RepCounter2()
+    xs = []
+    for i in range(len(a)):
+        c.push(a[i, 0], a[i, 1:4], a[i, 7:10])
+        xs.append(float(c.vs @ c.axis))
+    t = a[:, 0]
+    g = a[:, 7:10] - a[:, 7:10].mean(0)
+    with np.errstate(all="ignore"):
+        u = np.linalg.svd(g, full_matrices=False)[2][0]
+        tilt = np.nan_to_num(g @ u)
+    W, H = 900, 150
+    T = max(t[-1], 1)
+    x = lambda v: v / T * W
+    def line(v, cls):
+        top = max(np.abs(v).max(), 1e-6)
+        pts = " ".join(f"{x(a_):.1f},{H / 2 - b / top * (H / 2 - 12):.1f}" for a_, b in zip(t[::2], np.asarray(v)[::2]))
+        return f'<polyline class="{cls}" points="{pts}"/>'
+    marks = ""
+    colors = {"speed": "#30d158", "tilt": "#0a84ff", "both": "#bf5af2"}
+    for at, what in (meta.get("helpers") or {}).get("log", []):
+        w = str(what)
+        if w.startswith("rep "):
+            col = colors.get(w.split()[-1], "#888")
+            marks += f'<line x1="{x(at):.1f}" x2="{x(at):.1f}" y1="0" y2="{H - 14}" stroke="{col}" stroke-width="2"><title>{html.escape(w)} at {at}s</title></line>'
+        else:
+            col = "#ff9f0a" if w.startswith("edit") else "#8e8e93"
+            marks += (f'<line x1="{x(at):.1f}" x2="{x(at):.1f}" y1="0" y2="{H}" stroke="{col}" stroke-dasharray="3 3"/>'
+                      f'<text x="{x(at) + 2:.1f}" y="10" fill="{col}">{html.escape(w)}</text>')
+    mac = "".join(f'<line x1="{x(e):.1f}" x2="{x(e):.1f}" y1="{H - 10}" y2="{H}" stroke="currentColor" stroke-width="2"/>' for e in c.events)
+    return (f'<svg class="dbg" viewBox="0 0 {W} {H}" preserveAspectRatio="none">{line(tilt, "tl")}{line(xs, "vl")}{marks}{mac}</svg>'
+            f'<p class="dim">{T:.0f} s. Mac replay: speed {c.reps}.</p>')
+
+
+def debug_page(rows):
+    """Every recorded set: what the watch counted against the reps logged (on the watch at Done, and
+    in the end on the server, where the iPhone may have changed them), worst first."""
+    body = ('<h1>Rep counter debug</h1><p class="dim">Watch: what the counter said. At Done: the reps '
+            'sent from the watch (after any crown edit). Logged: the reps in the workout now. Sets '
+            'with a difference first; each with its timeline: red velocity, blue tilt; watch reps as '
+            'green (speed), blue (tilt), purple (both); orange: your edits; grey: the end; black '
+            'ticks below: the Mac replay of today\'s code.</p>')
+    rows.sort(key=lambda r: (-abs(r["diff"]) if r["diff"] is not None else 1, -r["start"]))
+    for r in rows:
+        d = "–" if r["diff"] is None else f'{r["diff"]:+d}'
+        body += (f'<h2>{datetime.fromtimestamp(r["start"] / 1000):%d %b %H:%M} · {html.escape(r["name"])} · '
+                 f'set {r["set"]}</h2><p>Watch {r["auto"] if r["auto"] is not None else "–"} · at Done '
+                 f'{r["done"]} · logged {r["logged"] if r["logged"] is not None else "–"} · '
+                 f'<b>difference {d}</b></p>{r["svg"]}')
+    return page("Rep counter debug", body)
+
+
 def main():
     every = "--all" in sys.argv
     if "--install-watch" in sys.argv:
@@ -400,6 +457,24 @@ def main():
                 hr_files[meta.get("wid")] = (meta, a)
             elif meta.get("wid") and meta.get("end"):
                 motions[(meta["wid"], meta.get("exId"), round(meta["end"]))] = (meta, a)
+        dbg = []
+        logged = {}
+        for w in workouts:
+            for e in w["entries"]:
+                for st in e["sets"]:
+                    if st.get("done") and st.get("at"):
+                        logged[(w["id"], e["id"], round(st["at"]))] = st.get("r")
+        for (wid, ex, end), (meta, a) in motions.items():
+            # under 3 s: Start then Done at once, nothing to learn from
+            if a is None or len(a) < 150 or meta.get("auto") is None:
+                continue
+            lg = logged.get((wid, ex, end))
+            truth = lg if lg is not None else meta.get("reps")
+            dbg.append({"start": meta.get("start") or end, "name": name_of(ex), "set": meta.get("set"),
+                        "auto": meta.get("auto"), "done": meta.get("reps"), "logged": lg,
+                        "diff": None if truth is None else int(meta["auto"] - truth), "svg": debug_timeline(meta, a)})
+        with open(os.path.join(out_dir, "debug.html"), "w", encoding="utf-8") as f:
+            f.write(debug_page(dbg))
         newest = max([os.path.getmtime(state_file)] + [os.path.getmtime(f) for f in glob.glob(os.path.join(DATA, "motion", uid, "*.csv"))])
         for w in workouts:
             name = datetime.fromtimestamp(w["start"] / 1000).strftime("%Y-%m-%d-%H%M") + f'-{w["id"]}.html'
@@ -426,7 +501,7 @@ def main():
                     for t, n, x in sorted(links, reverse=True))
     wk_items = "".join(f'<li><a href="week-{w}.html">Week {w}</a></li>' for w in sorted(set(week_links), reverse=True))
     with open(os.path.join(out_dir, "index.html"), "w", encoding="utf-8") as f:
-        f.write(page("Workouts", f'<h1>Weeks</h1><ul>{wk_items}</ul><h1>Workouts</h1><ul>{items}</ul>'))
+        f.write(page("Workouts", f'<p><a href="debug.html">Rep counter debug</a></p><h1>Weeks</h1><ul>{wk_items}</ul><h1>Workouts</h1><ul>{items}</ul>'))
     print(f"{made} report(s) written to {out_dir}")
 
 

@@ -31,8 +31,9 @@ final class MotionRecorder {
     /// How long the wrist has been still (auto-end of a set); only touched on `queue`.
     private var stillness = Stillness()
     private var lastT = 0.0
-    /// A rep was counted; called on the main queue.
-    var onRep: (() -> Void)?
+    /// A rep was counted; called on the main queue with when (seconds since 1970) and which counter
+    /// saw it first: "speed", "tilt" or "both" (the set file's log, for debugging the counter).
+    var onRep: ((Double, String) -> Void)?
 
     static var outbox: URL {
         let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
@@ -68,10 +69,13 @@ final class MotionRecorder {
             // tilt misses reps that hardly turn the wrist. Two at once when one counter jumps.
             // ponytail: max adds up both counters' overcounts; a fused signal is the next step.
             let before = max(self.counter.reps, self.tilt.reps)
+            let (v0, t0) = (self.counter.reps, self.tilt.reps)
             self.counter.push(t: s.t, ax: s.ax, ay: s.ay, az: s.az)
             _ = self.tilt.push(t: s.t, gx: s.gx, gy: s.gy, gz: s.gz)
+            let source = self.counter.reps > v0 && self.tilt.reps > t0 ? "both" : self.counter.reps > v0 ? "speed" : "tilt"
             for _ in before..<max(self.counter.reps, self.tilt.reps) {
-                DispatchQueue.main.async { self.onRep?() }
+                let t = s.t
+                DispatchQueue.main.async { self.onRep?(t, source) }
             }
             if self.samples.count > cap { MotionLog.trim(&self.samples, now: s.t) }
         }

@@ -79,7 +79,17 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
     /// What happened to the animations, newest last (the hidden debug screen).
     @Published private(set) var clipLog: [String] = []
     @Published var weight: Double = 0 { didSet { if weight != oldValue { ackRestOver() } } }
-    @Published var reps: Double = 0 { didSet { if reps != oldValue { ackRestOver() } } }
+    @Published var reps: Double = 0 {
+        didSet {
+            guard reps != oldValue else { return }
+            ackRestOver()
+            // A change by hand while a set is counted: the crown or - and + (the set file's log).
+            if recordingSince != nil && !counting { note("edit \(formatReps(oldValue))>\(formatReps(reps))") }
+        }
+    }
+    /// The counter is changing `reps` (not the lifter).
+    private var counting = false
+    private func formatReps(_ v: Double) -> String { v.rounded() == v ? String(Int(v)) : String(v) }
     /// A hold's seconds, for the set up next (the crown turns it).
     @Published var seconds: Double = 0 { didSet { if seconds != oldValue { ackRestOver() } } }
     /// The effort rated for the set up next (RPE or RIR, the profile's scale), nil until rated.
@@ -170,7 +180,7 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
             }
         }
         health.onStatus = { [weak self] in self?.sendStatus() }
-        health.motion.onRep = { [weak self] in self?.countRep() }
+        health.motion.onRep = { [weak self] t, source in self?.countRep(at: t, source: source) }
         let center = UNUserNotificationCenter.current()
         center.delegate = self
         if !isDemo { center.requestAuthorization(options: [.alert, .sound]) { _, _ in } }
@@ -272,7 +282,9 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
         // The reps count up from 0 now; what was planned stays in sight as the goal.
         repGoal = reps
         autoReps = 0
+        counting = true
         reps = 0
+        counting = false
         fatigueWarned = false
         autoEndAt = nil
         autoEndHeld = false
@@ -345,10 +357,14 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
 
     /// The counter saw a rep (MotionRecorder.onRep): one more, and a tap on the wrist; a longer
     /// one when the goal is reached.
-    private func countRep() {
-        guard recordingSince != nil else { return }
+    private func countRep(at t: Double, source: String) {
+        guard let since = recordingSince else { return }
         autoReps += 1
+        counting = true
         reps += 1
+        counting = false
+        // the sample's own time, not the moment the main queue got to it
+        setLog.append([((t - since.timeIntervalSince1970) * 10).rounded() / 10, "rep \(autoReps) \(source)"])
         lastRepAt = Date()
         if autoEndAt != nil { autoEndAt = nil; note("autoEndRep") }
         // ponytail: which taps are felt mid-set is the user's to say; these are a first pick.
@@ -567,6 +583,7 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
         // In a superset the page flips to the partner: a slower second tap would log its set.
         if heldFor == nil, !auto, !touchAllowed { return }
         lastTick = Date()
+        if !auto { note("done") }
         restOverSince = nil
         ackRestOver()
         let ei = entryIndex
