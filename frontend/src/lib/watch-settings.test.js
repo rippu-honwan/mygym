@@ -11,7 +11,7 @@ describe('the choices', () => {
     expect(readWatchPrefs()).toEqual({ ...WATCH_DEFAULTS })
     const seen = vi.fn()
     onWatchPrefs(seen)
-    expect(writeWatchPrefs({ autoShow: false, crown: 'weight', junk: 1, health: true })).toEqual({ enabled: true, autoShow: false, restHaptics: true, crown: 'weight', show: { ...SHOW_DEFAULTS } })
+    expect(writeWatchPrefs({ autoShow: false, crown: 'weight', junk: 1, health: true })).toEqual({ enabled: true, autoShow: false, restHaptics: true, crown: 'weight', fatigue: 0, autoEnd: false, show: { ...SHOW_DEFAULTS } })
     expect(readWatchPrefs().crown).toBe('weight')
     expect(seen).toHaveBeenCalled()
     localStorage.setItem('gym_watch_v1', '{broken')
@@ -50,5 +50,19 @@ describe('what the watch shows', () => {
     expect(settingsForWatch().show).toEqual(readWatchPrefs().show)
     localStorage.setItem('gym_watch_v1', JSON.stringify({ show: { hr: 'yes', rest: 'spiral' } }))
     expect(readWatchPrefs().show).toEqual({ ...SHOW_DEFAULTS })
+  })
+})
+
+describe('MyGym rep counter switches', () => {
+  it('are off by default and reach the watch only when on', () => {
+    expect(readWatchPrefs()).toMatchObject({ fatigue: 0, autoEnd: false })
+    expect(settingsForWatch()).not.toHaveProperty('fatigue')
+    writeWatchPrefs({ fatigue: 0.3, autoEnd: true })
+    expect(settingsForWatch(readWatchPrefs())).toMatchObject({ fatigue: 0.3, autoEnd: true })
+  })
+
+  it('keeps only the offered fatigue steps', () => {
+    writeWatchPrefs({ fatigue: 0.55 })
+    expect(readWatchPrefs().fatigue).toBe(0)
   })
 })

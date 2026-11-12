@@ -88,6 +88,15 @@ export default function WatchSettingsPage() {
           <Switch checked={prefs.restHaptics} onChange={v => set({ restHaptics: v })} aria-label={t('Tap the wrist when a rest is over')} />
         </Row>
       </Section>
+      {/* MyGym: the rep counter's choices (docs/dev/rep-counter.md). */}
+      <Section title="Rep counter" footer="Both work from Start set to Done. Fatigue alert: two taps when your reps slow down this much against the first ones. Auto-end: after a rep, keep the wrist still for 4 seconds; an orange ring counts 3 more, a tap keeps the set going.">
+        <SelectRow icon="vibrate" iconTint="var(--orange)" title="Fatigue alert" value={String(prefs.fatigue)}
+          onChange={v => set({ fatigue: Number(v) })}
+          options={[{ value: '0', label: 'Off' }, { value: '0.2', label: '20% slower' }, { value: '0.3', label: '30% slower' }, { value: '0.4', label: '40% slower' }]} />
+        <Row icon="timer" iconTint="var(--green)" title="End a set when the wrist is still">
+          <Switch checked={prefs.autoEnd} onChange={v => set({ autoEnd: v })} aria-label="End a set when the wrist is still" />
+        </Row>
+      </Section>
     </>}
   </>
 }

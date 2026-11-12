@@ -33,6 +33,9 @@ struct RepCounter {
     static let sizeRange = 0.5...2.2, periodRange = 0.5...2.0
 
     private(set) var reps = 0
+    /// Each counted rep's swing size (its speed, top to bottom) and when it was counted: the set's
+    /// speed summary and the fatigue alert (SetSpeed).
+    private(set) var repSizes: [Double] = [], repTimes: [Double] = []
     private let dt: Double
     private var mean: SIMD3<Double>?
     private var v = SIMD3<Double>(), vs = SIMD3<Double>()
@@ -76,7 +79,7 @@ struct RepCounter {
             if was < 0 {
                 let period = last.map { t - $0 }
                 if period == nil || period! >= RepCounter.minPeriod {
-                    swing(size: top - bottom, period: period)
+                    swing(size: top - bottom, period: period, t: t)
                     last = t
                     top = x; bottom = 0
                 }
@@ -100,21 +103,25 @@ struct RepCounter {
         return period >= RepCounter.periodRange.lowerBound * p && period <= RepCounter.periodRange.upperBound * p
     }
 
-    private mutating func swing(size: Double, period: Double?) {
+    private mutating func swing(size: Double, period: Double?, t: Double) {
         guard size >= RepCounter.minSize else { return }
         if sizes.isEmpty {
             sizes = [size]; periods = []; reps += 1
+            repSizes.append(size); repTimes.append(t)
         } else if like(size, period, sizes: sizes, periods: periods) {
             sizes.append(size); odd = nil
             if let p = period { periods.append(p) }
             reps += 1
+            repSizes.append(size); repTimes.append(t)
         } else if sizes.count == 1 {
             // The lone first swing was getting into position: this one is rep 1 in its place.
             sizes = [size]; periods = []; odd = nil
+            if !repSizes.isEmpty { repSizes[repSizes.count - 1] = size; repTimes[repTimes.count - 1] = t }
         } else if let o = odd, like(size, nil, sizes: [o], periods: []) {
             // Two alike in a row, unlike the reps before: the reps changed, both count.
             sizes = [o, size]; periods = period.map { [$0] } ?? []; odd = nil
             reps += 2
+            repSizes += [o, size]; repTimes += [t, t]
         } else {
             odd = size
         }

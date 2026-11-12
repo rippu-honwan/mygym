@@ -28,6 +28,9 @@ final class MotionRecorder {
     private var counter = RepCounter()
     /// The second counter, on the wrist's tilt: it sees slow reps the speed counter misses.
     private var tilt = TiltCounter()
+    /// How long the wrist has been still (auto-end of a set); only touched on `queue`.
+    private var stillness = Stillness()
+    private var lastT = 0.0
     /// A rep was counted; called on the main queue.
     var onRep: (() -> Void)?
 
@@ -46,6 +49,7 @@ final class MotionRecorder {
             self?.samples = []
             self?.counter = RepCounter()
             self?.tilt = TiltCounter()
+            self?.stillness = Stillness()
         }
         MotionRecorder.resendLeftovers()
         manager.deviceMotionUpdateInterval = 1 / MotionLog.hz
@@ -58,6 +62,8 @@ final class MotionRecorder {
             let s = MotionSample(t: bootAt + m.timestamp, ax: a.x, ay: a.y, az: a.z,
                                  rx: r.x, ry: r.y, rz: r.z, gx: g.x, gy: g.y, gz: g.z)
             self.samples.append(s)
+            self.stillness.push(t: s.t, ax: s.ax, ay: s.ay, az: s.az)
+            self.lastT = s.t
             // The larger of the two counts (docs/dev/rep-counter.md): speed misses slow reps,
             // tilt misses reps that hardly turn the wrist. Two at once when one counter jumps.
             // ponytail: max adds up both counters' overcounts; a fused signal is the next step.
@@ -74,6 +80,18 @@ final class MotionRecorder {
     func stop() {
         manager.stopDeviceMotionUpdates()
         queue.addOperation { [weak self] in self?.samples = [] }
+    }
+
+    /// The set so far: each counted rep's speed and time (the speed counter's), and how many
+    /// seconds the wrist has been still.
+    func status() -> (sizes: [Double], times: [Double], still: Double) {
+        var out: (sizes: [Double], times: [Double], still: Double) = ([], [], 0)
+        let op = BlockOperation { [weak self] in
+            guard let self = self else { return }
+            out = (self.counter.repSizes, self.counter.repTimes, self.stillness.stillFor(at: self.lastT))
+        }
+        queue.addOperations([op], waitUntilFinished: true)
+        return out
     }
 
     /// The samples between two moments, seconds since 1970.

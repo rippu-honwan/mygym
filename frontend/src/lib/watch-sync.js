@@ -54,7 +54,16 @@ const okBw = v => { const n = num(v); return n != null && n > 0 && n < 700 }
 // One side of a per-side set, from the watch: 'L', 'R', or none (the whole set).
 const sideOf = v => (v === 'L' || v === 'R' ? v : null)
 // What a tick of a hold (`sec`) or of one side carries besides the numbers; nothing for a plain set.
-const extraOf = ev => ({ ...(num(ev.sec) != null ? { sec: num(ev.sec) } : {}), ...(sideOf(ev.side) ? { side: sideOf(ev.side) } : {}), ...effortFrom(ev) })
+const extraOf = ev => ({ ...(num(ev.sec) != null ? { sec: num(ev.sec) } : {}), ...(sideOf(ev.side) ? { side: sideOf(ev.side) } : {}), ...effortFrom(ev), ...velFrom(ev) })
+// MyGym: the set's speed from the watch's rep counter, { vel: { best, last, loss } } (relative
+// speeds; loss 0-1), or nothing when it does not hold up.
+export function velFrom (ev) {
+  const v = ev && ev.vel
+  if (!v || typeof v !== 'object') return {}
+  const best = num(v.best), last = num(v.last), loss = num(v.loss)
+  if (best == null || last == null || loss == null || best <= 0 || best > 50 || last < 0 || last > 50 || loss < 0 || loss > 1) return {}
+  return { vel: { best, last, loss } }
+}
 // The effort the watch logged on a set: { rpe } or { rir } on the half-point grid, inside the
 // phone's own scale (lib/history.js EFFORT); nothing for none, or for a number that does not hold up.
 export function effortFrom (ev) {

@@ -159,6 +159,10 @@ struct WatchSettings: Codable, Equatable {
     var effort: String?
     /// Timed holds start by themselves (the phone's Settings → Workout): rest over, 3-2-1, hold.
     var autoHolds: Bool?
+    /// MyGym: a tap when a set's reps slow down this much (0.3: 30 %); nil or 0: off.
+    var fatigue: Double?
+    /// MyGym: a set ends by itself when the wrist is still for a few seconds after a rep.
+    var autoEnd: Bool?
 }
 
 /// What a workout screen shows. Each nil means its default.

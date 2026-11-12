@@ -273,8 +273,46 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
         repGoal = reps
         autoReps = 0
         reps = 0
+        fatigueWarned = false
+        autoEndAt = nil
+        autoEndHeld = false
+        autoEndTimer?.invalidate()
+        if state.settings.autoEnd == true {
+            autoEndTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+                DispatchQueue.main.async { self?.checkAutoEnd() }
+            }
+        }
         WKInterfaceDevice.current().play(.start)
     }
+
+    /// Auto-end (setting): after a rep and 3 s into the set, 4 s of a still wrist start a 3 s
+    /// countdown on Done; moving again stops it, a tap cancels it, at 0 the set is done.
+    private func checkAutoEnd() {
+        guard let since = recordingSince, autoReps >= 1, Date().timeIntervalSince(since) >= 3 else { return }
+        let still = health.motion.status().still
+        if still < 1 { autoEndHeld = false; autoEndAt = nil; return }
+        if let at = autoEndAt {
+            if Date() >= at { autoEndAt = nil; completeSet() }
+        } else if still >= 4 && !autoEndHeld {
+            autoEndAt = Date().addingTimeInterval(3)
+            WKInterfaceDevice.current().play(.click)
+        }
+    }
+
+    /// A tap during the countdown: the set goes on.
+    func cancelAutoEnd() {
+        guard autoEndAt != nil else { return }
+        autoEndAt = nil
+        autoEndHeld = true
+    }
+
+    /// MyGym: when a still wrist ends the set by itself (a countdown on Done); nil: not counting down.
+    @Published private(set) var autoEndAt: Date?
+    /// The lifter cancelled the countdown: no new one until the wrist moves again.
+    private var autoEndHeld = false
+    private var autoEndTimer: Timer?
+    /// The fatigue tap came in this set already.
+    private var fatigueWarned = false
 
     /// While a set is recorded: the reps planned for it (the tile shows the count instead).
     @Published private(set) var repGoal: Double?
@@ -289,11 +327,22 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
         reps += 1
         // ponytail: which taps are felt mid-set is the user's to say; these are a first pick.
         WKInterfaceDevice.current().play(reps == repGoal ? .success : .directionUp)
+        // Fatigue (setting): once per set, two taps apart from the rep's own.
+        if let limit = state.settings.fatigue, limit > 0, !fatigueWarned {
+            let st = health.motion.status()
+            if SetSpeed.fatigued(sizes: st.sizes, times: st.times, limit: limit) {
+                fatigueWarned = true
+                for d in [0.35, 0.7] { DispatchQueue.main.asyncAfter(deadline: .now() + d) { WKInterfaceDevice.current().play(.retry) } }
+            }
+        }
     }
 
     /// A recording that ends without Done (skipped, another set picked, the workout over): no file.
     private func stopRecording() {
         guard recordingSince != nil else { return }
+        autoEndTimer?.invalidate()
+        autoEndTimer = nil
+        autoEndAt = nil
         health.motion.stop()
         recordingSince = nil
         // Not counting any more: the plan's reps again (the next set loads its own after this).
@@ -509,10 +558,13 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
             tr = recordingSince != nil && reps == 0 ? (repGoal ?? reps) : reps
         }
         let rated = effortKind.flatMap { k in effort.map { Effort.Rating(kind: k, value: $0) } }
-        let (next, event) = SessionCore.tick(state, entry: ei, set: si, side: side, w: tw, r: tr, sec: tsec,
+        // The set's speed (MyGym): best, last and loss, for the phone's set and the motion file.
+        let vel = recordingSince != nil ? SetSpeed.summary(health.motion.status().sizes) : nil
+        var (next, event) = SessionCore.tick(state, entry: ei, set: si, side: side, w: tw, r: tr, sec: tsec,
                                              at: now.timeIntervalSince1970 * 1000, id: UUID().uuidString, hr: hr, effort: rated)
         // Sent first, saved second: killed in between, the phone still has the tick (and the next
         // snapshot brings it back here); the other way round the tick would be lost on the phone.
+        if let v = vel { event?["vel"] = v }
         if let event = event { send(event: event) }
         if let since = recordingSince {
             // The set's motion, from Start set to this Done, for the rep counter (MotionRecorder).
@@ -523,6 +575,7 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
             if let id = event?["id"] { meta["id"] = id }
             // What the counter said, next to the reps logged: how good it is, set by set.
             meta["auto"] = autoReps
+            if let v = vel { meta["vel"] = v }
             // The heart rate from the last Done (the rest before this set, at most 10 min) to this
             // one, as [seconds from Start set, bpm]: to tune a rest that ends by heart rate.
             let hrFrom = max(doneBefore ?? since.addingTimeInterval(-300), since.addingTimeInterval(-600))

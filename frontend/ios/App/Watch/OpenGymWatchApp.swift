@@ -117,7 +117,7 @@ struct RootView: View {
             }
         }
         // Any touch: the rest-over alarm was noticed (it would tap once more otherwise).
-        .simultaneousGesture(TapGesture().onEnded { store.ackRestOver() })
+        .simultaneousGesture(TapGesture().onEnded { store.ackRestOver(); store.cancelAutoEnd() })
         // The complication's Start: today's workout, when none runs yet.
         .onOpenURL { url in
             if url.host == "start", store.workout == nil, let today = store.ready?.today { store.start(today) }
@@ -410,6 +410,14 @@ struct ExerciseList: View {
             }
             .onAppear { reader.scrollTo(store.entryIndex, anchor: .center) }
         }
+    }
+}
+
+extension View {
+    /// MyGym: the Apple Watch double tap (thumb and finger, watchOS 11, Series 9 and later) presses
+    /// this button: Start set and Done without the other hand.
+    @ViewBuilder func primaryDoubleTap() -> some View {
+        if #available(watchOS 11.0, *) { self.handGestureShortcut(.primaryAction) } else { self }
     }
 }
 
@@ -736,11 +744,21 @@ struct ExercisePage: View {
                 // Rep counter: the sensor records only from Start set to Done (MotionRecorder).
                 RoundButton(systemImage: "play.fill", label: Text("Start set"), size: doneSize,
                             caption: !typeSize.isAccessibilitySize) { store.startSet() }
+                    .primaryDoubleTap()
             } else {
                 // At the accessibility sizes the word under the check goes (VoiceOver still says it):
                 // the room it takes is what pushed the page up into the clock on 41 mm.
                 RoundButton(systemImage: "checkmark", label: Text("Done"), size: doneSize,
                             caption: !typeSize.isAccessibilitySize) { store.completeSet() }
+                    .primaryDoubleTap()
+                    // Auto-end (setting): the set ends when this ring has run out; a tap stops it.
+                    .overlay {
+                        if current, let at = store.autoEndAt {
+                            CountdownRing(start: at.addingTimeInterval(-3), end: at, color: .orange)
+                                .frame(width: doneSize + 10, height: doneSize + 10)
+                                .allowsHitTesting(false)
+                        }
+                    }
                     // Recording: a red dot on the button.
                     .overlay(alignment: .topTrailing) {
                         if current && store.recordingSince != nil {

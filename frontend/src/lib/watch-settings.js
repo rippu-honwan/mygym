@@ -8,6 +8,8 @@
 //   restHaptics  the wrist taps when a rest is over
 //   crown        what the Digital Crown turns first on a set: 'reps' or 'weight' (older watch apps;
 //                the watch now edits a value on its own screen, the crown there is that value's)
+//   fatigue      MyGym: a tap when a set's reps slow down by this share (0, 0.2, 0.3, 0.4; 0 off)
+//   autoEnd      MyGym: a set ends by itself when the wrist is still for a few seconds
 //   show         what a workout screen shows: clip (the animation), hr, last (last time's sets),
 //                elapsed (time so far), kcal, next (the next exercise during a rest), and rest:
 //                'ring' or 'plain' (the countdown alone)
@@ -20,7 +22,8 @@ export const WATCH_STATUS_KEY = 'gym_watch_status_v1'
 // `garmin`, docs/GARMIN.md). Settings → Modules asks before Watch goes off while one is there.
 export const GARMIN_LINK_KEY = 'gym_garmin_link_v1'
 export const SHOW_DEFAULTS = Object.freeze({ clip: true, hr: true, last: true, elapsed: false, kcal: false, next: true, rest: 'ring' })
-export const WATCH_DEFAULTS = Object.freeze({ enabled: true, autoShow: true, restHaptics: true, crown: 'reps', show: SHOW_DEFAULTS })
+export const FATIGUE_STEPS = Object.freeze([0, 0.2, 0.3, 0.4])
+export const WATCH_DEFAULTS = Object.freeze({ enabled: true, autoShow: true, restHaptics: true, crown: 'reps', fatigue: 0, autoEnd: false, show: SHOW_DEFAULTS })
 
 const showOf = v => {
   const o = v && typeof v === 'object' ? v : {}
@@ -43,6 +46,8 @@ export function readWatchPrefs(storage = globalThis.localStorage) {
     autoShow: v.autoShow !== false,
     restHaptics: v.restHaptics !== false,
     crown: v.crown === 'weight' ? 'weight' : 'reps',
+    fatigue: FATIGUE_STEPS.includes(v.fatigue) ? v.fatigue : 0,
+    autoEnd: v.autoEnd === true,
     show: showOf(v.show),
   }
 }
@@ -84,4 +89,9 @@ export function writeWatchStatus(ev, storage = globalThis.localStorage) {
 }
 
 /** The choices as the watch reads them (WatchCore Model.swift WatchSettings); `health` is the phone's Apple Health switch. */
-export const settingsForWatch = (p = readWatchPrefs(), health = false) => ({ health: !!health, restHaptics: p.restHaptics, crown: p.crown, show: { ...p.show } })
+export const settingsForWatch = (p = readWatchPrefs(), health = false) => ({
+  health: !!health, restHaptics: p.restHaptics, crown: p.crown, show: { ...p.show },
+  // MyGym's rep counter switches, only when on (an off one is what the watch assumes anyway)
+  ...(p.fatigue ? { fatigue: p.fatigue } : {}),
+  ...(p.autoEnd ? { autoEnd: true } : {}),
+})
