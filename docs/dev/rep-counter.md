@@ -677,3 +677,4 @@ these curves; then a phone setting and the watch's "ready" tap.
   with each set shaded (Start set to Done), minutes per range (<100, 100-120, ... 160+ bpm) and the
   3 highest moments with what was on. Checked with made-up readings only; old workouts have none.
   Needs Apple Health on (no session, no readings).
+  The user confirmed sync after this install (2026-11-13).
