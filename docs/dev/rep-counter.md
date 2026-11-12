@@ -746,3 +746,4 @@ NOT yet verified on the devices: double tap, fatigue taps, auto-end, the readine
 - Tempo coach (haptic beat per exercise), data cleaning flags, exercise auto-recognition (months
   of labelled data), form analysis (wrist roll, path consistency), sync away from home
   (Tailscale), Colima starting with the Mac, readiness on the watch at workout start.
+- Backup destination: iCloud Drive/MyGym-backup (the user's choice, 2026-11-13); first backup made (2.2 MB). The daily job (--install) is for the user to turn on.
