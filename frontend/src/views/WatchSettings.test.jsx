@@ -82,5 +82,17 @@ describe('Settings → Apple Watch', () => {
     expect(row(el, 'Rest timer')).toBeTruthy()
     expect(row(el, 'The Digital Crown turns first')).toBeUndefined()
   })
+
+  // MyGym: the rep counter's two switches, off until turned on, and kept for the watch.
+  it('has the rep counter switches, off by default', async () => {
+    const el = await mount()
+    expect(el.textContent).toContain('Rep counter')
+    const auto = row(el, 'End a set when the wrist is still').querySelector('[role="switch"]')
+    expect(auto.getAttribute('aria-checked')).toBe('false')
+    await act(async () => { auto.click() })
+    expect(readWatchPrefs().autoEnd).toBe(true)
+    // the choice opens a sheet (SelectRow); the stored steps are tested in lib/watch-settings.test.js
+    expect(row(el, 'Fatigue alert').querySelector('.lrow-v').textContent).toBe('Off')
+  })
 })
 
