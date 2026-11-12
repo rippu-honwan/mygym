@@ -51,3 +51,7 @@ frontend/pdf-samples/
 
 # MyGym: local signing settings (scripts/ios/install-devices.sh)
 scripts/ios/local.env
+
+# Cloudflare fallback build (cloudflare/build.sh)
+/dist/
+.wrangler/
