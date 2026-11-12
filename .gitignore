@@ -48,3 +48,6 @@ assets/tee/
 assets/bmc-cover*
 # scripts/pdf/render-samples.mjs output (npm run pdf:check)
 frontend/pdf-samples/
+
+# MyGym: local signing settings (scripts/ios/install-devices.sh)
+scripts/ios/local.env
