@@ -48,4 +48,14 @@ final class MotionLogTests: XCTestCase {
         XCTAssertEqual(MotionLog.fileName(start: 1_794_234_605, exId: "0031", set: 2, zone: utc),
                        "20261109-143005_0031_s2.csv")
     }
+
+    func testAWorkoutsHeartRateFile() throws {
+        XCTAssertNil(MotionLog.heartRateCSV([], wid: "w1"))
+        let csv = try XCTUnwrap(MotionLog.heartRateCSV([(t: 1000, bpm: 98.4), (t: 1005.25, bpm: 121.6)], wid: "w1"))
+        let lines = csv.split(separator: "\n").map(String.init)
+        XCTAssertTrue(lines[0].hasPrefix("# {"))
+        XCTAssertTrue(lines[0].contains("\"kind\":\"hr\"") && lines[0].contains("\"wid\":\"w1\"") && lines[0].contains("\"start\":1000000"))
+        XCTAssertEqual(Array(lines.dropFirst()), ["t,bpm", "0.0,98", "5.2,122"])
+        XCTAssertTrue(MotionLog.fileName(start: 1000, exId: "hr", set: 0).hasSuffix("_hr_s0.csv"))
+    }
 }

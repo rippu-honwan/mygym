@@ -305,12 +305,15 @@ final class WorkoutManager: NSObject, ObservableObject, HKWorkoutSessionDelegate
     func end(save: Bool, at: Date? = nil, totals: ((Totals) -> Void)? = nil) {
         wanted = false
         motion.stop()
+        let wid = workoutId
         workoutId = nil
         prepared = false
         if let q = query { store.stop(q); query = nil }
         let endAt = at ?? Date()
         let all = samples.filter { $0.0 <= endAt }.map { $0.1 }
         let hr = Totals(hrAvg: all.isEmpty ? nil : (all.reduce(0, +) / Double(all.count)).rounded(), hrMax: all.max()?.rounded(), calories: nil)
+        // A saved workout's whole heart rate goes to the phone and the server (MotionRecorder).
+        if save { MotionRecorder.sendHeartRate(samples.filter { $0.0 <= endAt }, wid: wid) }
         guard let s = session, let b = builder else {
             if let totals = totals { DispatchQueue.main.async { totals(Totals()) } }
             return

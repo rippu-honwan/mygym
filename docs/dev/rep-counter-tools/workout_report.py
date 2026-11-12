@@ -101,7 +101,62 @@ def hr_text(h):
     return f'{h["avg"]:.0f} / {h["max"]:.0f}' if h else "–"
 
 
-def report(w, workouts, motions):
+BANDS = [(0, 100), (100, 120), (120, 140), (140, 160), (160, 999)]
+
+
+def hr_section(w, hr_file, motions):
+    """The whole workout's heart rate (the watch's file at Finish): a line over time with each
+    recorded set shaded, the time spent in each range, and the highest moments with what was on."""
+    if not hr_file or hr_file[1] is None or len(hr_file[1]) < 2:
+        return ""
+    meta, a = hr_file
+    t = meta["start"] / 1000 + a[:, 0]
+    bpm = a[:, 1]
+    t0, t1 = w["start"] / 1000, max(t[-1], (w.get("end") or 0) / 1000)
+    lo, hi = min(bpm.min(), 80), max(bpm.max(), 160)
+    W, H = 900, 180
+    x = lambda v: (v - t0) / max(1, t1 - t0) * W
+    y = lambda v: H - (v - lo) / (hi - lo) * H
+    # what was on at a moment: the set whose Start set..Done covers it, else the last Done before it
+    sets = []
+    for e in w["entries"]:
+        for s in e["sets"]:
+            if s.get("done") and s.get("at"):
+                m = motions.get((w["id"], e["id"], round(s["at"])), ({}, None))[0]
+                sets.append(((m.get("start") or s["at"]) / 1000, s["at"] / 1000, name_of(e["id"])))
+    sets.sort()
+    shade = "".join(f'<rect class="set" x="{x(a_):.1f}" y="0" width="{max(1.5, x(b) - x(a_)):.1f}" height="{H}"/>'
+                    for a_, b, _ in sets)
+    line = " ".join(f"{x(a_):.1f},{y(b):.1f}" for a_, b in zip(t, bpm))
+    grid = "".join(f'<line class="grid" x1="0" x2="{W}" y1="{y(v):.1f}" y2="{y(v):.1f}"/>'
+                   f'<text x="2" y="{y(v) - 3:.1f}">{v}</text>' for v in (100, 120, 140, 160) if lo < v < hi)
+    svg = (f'<svg class="hr" viewBox="0 0 {W} {H}" preserveAspectRatio="none" role="img" '
+           f'aria-label="Heart rate during the workout">{shade}{grid}<polyline points="{line}"/></svg>')
+    dt = np.diff(t, append=t[-1])
+    dt = np.minimum(dt, 30)  # a gap in the readings is not time at that rate
+    bands = "".join(
+        f'<div><b>{dt[(bpm >= a_) & (bpm < b)].sum() / 60:.0f} min</b>'
+        f'{"under 100" if a_ == 0 else (f"{a_}+" if b == 999 else f"{a_}–{b}")} bpm</div>'
+        for a_, b in BANDS)
+
+    def doing(v):
+        on = [n for a_, b, n in sets if a_ - 5 <= v <= b + 45]
+        before = [n for a_, b, n in sets if b <= v]
+        return on[-1] if on else (f"rest after {before[-1]}" if before else "warming up")
+    peaks, used = [], []
+    for i in np.argsort(-bpm):
+        if all(abs(t[i] - u) > 120 for u in used):
+            used.append(t[i]); peaks.append(i)
+        if len(peaks) == 3:
+            break
+    top = "".join(f'<li>{datetime.fromtimestamp(t[i]):%H:%M} – {bpm[i]:.0f} bpm – {html.escape(doing(t[i]))}</li>'
+                  for i in sorted(peaks, key=lambda i: t[i]))
+    return (f'<h2>Heart rate</h2>{svg}<p class="dim">Shaded: from Start set to Done. '
+            f'Average {bpm.mean():.0f}, highest {bpm.max():.0f} bpm.</p><div class="tiles">{bands}</div>'
+            f'<p class="dim">Highest moments</p><ul>{top}</ul><h2>Sets</h2>')
+
+
+def report(w, workouts, motions, hr_file=None):
     """One workout's page."""
     sets = []  # every done set in time order, for the real rest lengths
     for ei, e in enumerate(w["entries"]):
@@ -161,7 +216,7 @@ def report(w, workouts, motions):
              'the best of the first three; a rising loss means you are near failure. Rest: from Done '
              'to the next Start set. Before: the heart rate in the rest before the set, from its high just '
              'after the last set to the moment you started, and how long it took to fall 20 bpm.</p>')
-    return page(w.get("name") or "Workout", head + table + notes)
+    return page(w.get("name") or "Workout", head + hr_section(w, hr_file, motions) + table + notes)
 
 
 def last_time(ex_id, w, workouts):
@@ -188,7 +243,9 @@ h1{font-size:22px;margin:0}.dim{color:var(--dim);font-size:13px}
 table{border-collapse:collapse;width:100%}th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top}
 thead th{font-size:12px;color:var(--dim);font-weight:500}tr.ex th{padding-top:18px;font-size:16px}
 .prev{display:block;font-weight:400;font-size:12px;color:var(--dim)}.off{color:var(--off)}
-.bars rect{fill:var(--accent)}a{color:inherit}.wrap{overflow-x:auto}
+.bars rect{fill:var(--accent)}h2{font-size:17px;margin:22px 0 8px}
+svg.hr{width:100%;height:180px;display:block}svg.hr polyline{fill:none;stroke:#ff375f;stroke-width:1.5;vector-effect:non-scaling-stroke}
+svg.hr .set{fill:var(--line)}svg.hr .grid{stroke:var(--line);vector-effect:non-scaling-stroke}svg.hr text{fill:var(--dim);font-size:11px}a{color:inherit}.wrap{overflow-x:auto}
 """
 
 
@@ -211,12 +268,15 @@ def main():
         s = s.get("state", s)
         workouts = sorted([w for w in s.get("workouts", []) if w.get("start")], key=lambda w: w["start"])
         motions = {}
+        hr_files = {}
         for f in glob.glob(os.path.join(DATA, "motion", uid, "*.csv")):
             try:
                 meta, a = load_csv(f)
             except (OSError, ValueError):
                 continue
-            if meta.get("wid") and meta.get("end"):
+            if meta.get("kind") == "hr":
+                hr_files[meta.get("wid")] = (meta, a)
+            elif meta.get("wid") and meta.get("end"):
                 motions[(meta["wid"], meta.get("exId"), round(meta["end"]))] = (meta, a)
         newest = max([os.path.getmtime(state_file)] + [os.path.getmtime(f) for f in glob.glob(os.path.join(DATA, "motion", uid, "*.csv"))])
         for w in workouts:
@@ -225,7 +285,7 @@ def main():
             links.append((w["start"], name, w.get("name") or "Workout"))
             if every or not os.path.exists(path) or os.path.getmtime(path) < newest:
                 with open(path, "w", encoding="utf-8") as f:
-                    f.write(report(w, workouts, motions))
+                    f.write(report(w, workouts, motions, hr_files.get(w["id"])))
                 made += 1
     items = "".join(f'<li><a href="{n}">{datetime.fromtimestamp(t / 1000):%a %d %b %Y}</a> – {html.escape(x)}</li>'
                     for t, n, x in sorted(links, reverse=True))

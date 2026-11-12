@@ -39,6 +39,19 @@ enum MotionLog {
 
     /// Line 1: `# ` and the set's metadata as JSON. Then a header and one row per sample, with
     /// `t` in seconds since `from` (the set's start).
+    /// A whole workout's heart rate: line 1 `# ` and its metadata, then `t,bpm` with t in seconds
+    /// from the first reading. The phone and the server take it like a set's file.
+    static func heartRateCSV(_ readings: [(t: Double, bpm: Double)], wid: String?) -> String? {
+        guard let first = readings.first?.t, let last = readings.last?.t else { return nil }
+        var m: [String: Any] = ["v": 1, "kind": "hr", "exId": "hr", "start": (first * 1000).rounded(), "end": (last * 1000).rounded()]
+        if let wid = wid { m["wid"] = wid }
+        let json = (try? JSONSerialization.data(withJSONObject: m, options: [.sortedKeys]))
+            .flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
+        var out = "# \(json)\nt,bpm\n"
+        for r in readings { out += String(format: "%.1f,%.0f\n", r.t - first, r.bpm) }
+        return out
+    }
+
     static func csv(_ s: [MotionSample], from: Double, meta: [String: Any]) -> String {
         var m = meta
         m["v"] = 1

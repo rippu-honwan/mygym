@@ -671,3 +671,9 @@ set). `WorkoutManager.readings(from:to:)`. Only sets with a motion file get it (
 The report shows per set "before: <high after the last set> to <at Start set>, -20 in N s".
 Step 2 after the next gym session: pick the rule (drop in bpm from the high, min / max rest) from
 these curves; then a phone setting and the watch's "ready" tap.
+- Whole-workout heart rate (2026-11-13, installed): when a workout is saved, the watch sends every
+  reading of the session as one file `<date>_hr_s0.csv` (`kind: hr`, `wid`, `t,bpm`; WatchCore
+  `MotionLog.heartRateCSV`, 82 tests) through the same path as the set files. The report draws it
+  with each set shaded (Start set to Done), minutes per range (<100, 100-120, ... 160+ bpm) and the
+  3 highest moments with what was on. Checked with made-up readings only; old workouts have none.
+  Needs Apple Health on (no session, no readings).
