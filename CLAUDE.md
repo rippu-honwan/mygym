@@ -186,3 +186,15 @@ never feed the media to an AI tool.
 - Training-logic changes (progression, 1RM, session read-back) need a unit test in `src/lib`
   beside the code.
 - User-facing text: plain and human, no em dashes. CHANGELOG.md is written at release time.
+
+## This fork (rippu-honwan/mygym)
+
+MyGym is a personal fork with Apple Watch rep counting; read `docs/dev/rep-counter.md` first.
+
+- English only in code, comments, docs and commit messages. Chinese or Japanese belongs only in
+  translation files (`*.lproj`, `src/locales`, `catalogue/i18n`, store metadata, `ci/*-strings.mjs`).
+- Commits and pushes: no AI signatures of any kind (no `Co-Authored-By`, no "Generated with",
+  no session ids, no links to an AI tool) in commit messages, PR text or files.
+- Commit messages: English, short and precise. One subject line with a type prefix
+  (`feat:`, `fix:`, `docs:`, `build:`, `test:`), at most a few short body lines when needed.
+- Push only to `origin` (this fork), feature branches; never push to `upstream` (openGym).

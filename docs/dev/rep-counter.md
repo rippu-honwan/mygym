@@ -8,13 +8,13 @@ Read this file first at the start of every session; update it before the session
 1. iPhone and Apple Watch both record workouts (openGym already does this).
 2. The watch counts reps automatically for chosen exercises from the motion data (new).
 3. Data is stored as files on the user's Mac, which runs the openGym server (self-hosted `data/`).
-4. Claude on the Mac reads that data for analysis (openGym's `mcp/` server, or the files).
+4. An AI assistant on the Mac reads that data for analysis (openGym's `mcp/` server, or the files).
 
 ## Phases
 
 1. Phase 1: build our app (MyGym) on the real iPhone and Watch.
 2. Phase 1b: self-hosted server on the Mac (Colima + Docker, home Wi-Fi first, Tailscale later
-   if needed), pair MyGym with it, register `mcp/` with Claude Code.
+   if needed), pair MyGym with it, register `mcp/` with the AI assistant.
 3. Phase 2: the watch records motion data per set, sent via the iPhone to the server as files.
 4. Phase 3: collect data for 2-3 weeks.
 5. Phase 4: find the rep-counting algorithm in Python, port it to `WatchCore` with tests.
@@ -155,7 +155,7 @@ verified on a real workout.
 2. Start Upper A (has 0031 barbell curl) on the iPhone or the watch. Do 2 sets of barbell curl
    and 1 set of any leg exercise, ticking each set ON THE WATCH with the real rep count.
 3. Finish the workout, open MyGym on the iPhone and keep it open for ~30 s.
-4. Tell Claude. Claude copies the CSVs to the Mac:
+4. Report back; the CSVs are then copied to the Mac:
    `xcrun devicectl device copy from --device <iPhone UDID> --domain-type appDataContainer
    --domain-identifier com.rippuhonwan.mygym --source Documents/motion --destination data/motion-phone`
    and checks: curl sets present, leg set absent, ~50 rows/s, reps visible in a plot.
@@ -218,8 +218,8 @@ The user did not want rest time in the data. Now the sensor runs only from **Sta
   finished/discarded/started, a set ticked on the phone, or the workout ended or changed there.
 - Forgot Start: press Start then Done -> a very short CSV; drop CSVs under ~2 s in analysis.
 - `WorkoutManager` no longer starts the sensor with the workout; it still stops it on pause/end.
-- Strings: "Start set" in `ci/watch-strings.mjs` (zh-Hant 開始; other languages are my own
-  translations, unchecked), regenerated .lproj files.
+- Strings: "Start set" in `ci/watch-strings.mjs` (translations for all 18 app languages,
+  unchecked), regenerated .lproj files.
 - Checked: WatchCore 73 tests, frontend tests (only the known local `app-icons` failure);
   signed build installed on iPhone, then the embedded watch app on the watch.
 - The user's test 2026-11-11 (bench press 0025, workout `mwb425oqogoei`, 3 sets): windows 8.5 s,
@@ -267,7 +267,7 @@ contacted the server since 05:28, so the user must open MyGym on the iPhone at h
 schedule before leaving.
 
 Old note: the real upload was not verified at first. Next time: the user opens MyGym on the watch (once, after the
-reinstall), then on the iPhone at home; Claude checks `data/motion/<uid>/` got the 5 test CSVs
+reinstall), then on the iPhone at home; check that `data/motion/<uid>/` got the 5 test CSVs
 and the iPhone's `Documents/motion` is empty, then deletes those 5 test files. The user still has to
 delete the 2 test workouts of 2026-11-11 in MyGym.
 
@@ -279,10 +279,10 @@ delete the 2 test workouts of 2026-11-11 in MyGym.
   reps (not logged in Hevy). The user imports it in the app (Settings > Data & backup > Import from
   another app), so it syncs like any change.
 - New 4-day schedule from 2026-11-11 as a plan file `~/Downloads/mygym-new-plan.json`
-  (validated with `parsePlan`: 4 routines, 29 exercises, 0 dropped): Tue 軀幹 A, Wed 四肢 A,
-  Fri 軀幹 B, Sat 四肢 B; Mon/Thu/Sun rest. Exercise ids reuse the ids the Hevy history maps to
+  (validated with `parsePlan`: 4 routines, 29 exercises, 0 dropped): Tue Torso A, Wed Limbs A,
+  Fri Torso B, Sat Limbs B (the user named them in Chinese in the app); Mon/Thu/Sun rest. Exercise ids reuse the ids the Hevy history maps to
   where one exists (last time / progression connect). Rep ranges as `repsMin`/`repsMax`,
-  "6, 7 輪流做" as supersets (`sg`), 試/坐位調高/由下向上 as notes. Imported with "Use this weekly
+  "alternate 6 and 7" as supersets (`sg`), "try this weight", "seat higher", "low to high" as notes. Imported with "Use this weekly
   schedule" (replaces the Mon-Sun plan); the user then deletes the old Upper A/B, Lower A/B routines.
 
 ## Server on the Mac (Phase 1b)
@@ -303,8 +303,8 @@ colima stop                               # stop the VM
 Addresses: Mac browser `http://localhost:8080`, iPhone `http://<mac-name>.local:8080`
 (same Wi-Fi; plain http, home network only).
 
-Claude: MCP server `opengym` registered with `claude mcp add --scope local` for
-`~/dev/mygym` only (reads `data/` directly). Open Claude Code in `~/dev/mygym` to use it.
+AI assistant: MCP server `opengym` registered with local scope for `~/dev/mygym` only (reads
+`data/` directly). Start the assistant in `~/dev/mygym` to use it.
 
 ### The user's steps
 
@@ -314,7 +314,7 @@ Claude: MCP server `opengym` registered with `claude mcp add --scope local` for
 3. (After Phase 1 is on the iPhone) MyGym > Settings > Account > Connect to my server >
    `http://<mac-name>.local:8080` + the code. Allow "Local Network" when iOS asks.
    If macOS asks whether to accept incoming connections, allow.
-4. Tell Claude when done: Claude checks `data/db.json` and calls the MCP tools.
+4. Report back when done; then check `data/db.json` and call the MCP tools.
 
 Status 2026-11-09: step 1 done (profile `me`, admin; created with "Create new profile", not
 "Sign in with passkey"). MCP serves that profile and lists 11 tools; they answer "no synced state
@@ -367,7 +367,7 @@ only came at 23:20 when MyGym was open in the foreground. Sync needs the app ope
 4. Xcode > Settings > Accounts: add your Apple ID.
 5. In Xcode select the project `App`, then for each target `App`, `OpenGymWatch`,
    `OpenGymWatchWidgets`: Signing & Capabilities > Team = your Personal Team.
-   Note any red error text and send it to Claude.
+   Note any red error text and report it.
 6. Scheme `App`, destination your iPhone, press Run. On the iPhone: Settings > General >
    VPN & Device Management > trust your developer app.
 7. Scheme `OpenGymWatch`, destination your watch, press Run.
