@@ -201,3 +201,5 @@ MyGym is a personal fork with Apple Watch rep counting; read `docs/dev/rep-count
 - This fork is public: no personal details in tracked files or commits (device UDIDs, Apple team
   id, real names, hostnames, server user ids, emails). Use placeholders such as `<watch UDID>`,
   `<TEAM_ID>`, `<uid>`. The commit author email is the GitHub noreply address.
+- Keeping up with openGym: `git fetch upstream && git merge -m "merge: openGym upstream" upstream/main`
+  on the feature branch, then the tests (WatchCore `swift test`, frontend `npx vitest run`).
