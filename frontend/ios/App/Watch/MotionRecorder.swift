@@ -127,9 +127,9 @@ final class MotionRecorder {
 
     /// The finished workout's heart rate, every reading, as one file for the phone (the post-workout
     /// report shows when the heart rate was high).
-    static func sendHeartRate(_ readings: [(Date, Double)], wid: String?) {
+    static func sendHeartRate(_ readings: [(Date, Double)], wid: String?, daily: [String: [[Any]]] = [:]) {
         let r = readings.map { (t: $0.0.timeIntervalSince1970, bpm: $0.1) }
-        guard let first = r.first?.t, let csv = MotionLog.heartRateCSV(r, wid: wid) else { return }
+        guard let first = r.first?.t, let csv = MotionLog.heartRateCSV(r, wid: wid, extra: daily.isEmpty ? [:] : ["daily": daily]) else { return }
         let url = outbox.appendingPathComponent(MotionLog.fileName(start: first, exId: "hr", set: 0))
         DispatchQueue.global(qos: .utility).async {
             do { try csv.write(to: url, atomically: true, encoding: .utf8) } catch { return }

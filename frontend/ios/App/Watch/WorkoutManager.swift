@@ -40,6 +40,39 @@ final class WorkoutManager: NSObject, ObservableObject, HKWorkoutSessionDelegate
     /// A workout to measure (started here or picked up), even before the permission answer.
     private var wanted = false
 
+    /// The day's mean resting heart rate (bpm) and HRV (SDNN, ms) for each of the last 35 days that
+    /// has one: ["rhr": [["2026-11-13", 58], …], "hrv": […]]. Empty without permission.
+    func daily(_ done: @escaping ([String: [[Any]]]) -> Void) {
+        let kinds: [(String, HKQuantityTypeIdentifier, HKUnit)] = [
+            ("rhr", .restingHeartRate, bpm), ("hrv", .heartRateVariabilitySDNN, .secondUnit(with: .milli)),
+        ]
+        let cal = Calendar.current
+        let start = cal.date(byAdding: .day, value: -35, to: cal.startOfDay(for: Date()))!
+        var out: [String: [[Any]]] = [:]
+        let group = DispatchGroup()
+        let lock = NSLock()
+        let day = DateFormatter()
+        day.locale = Locale(identifier: "en_US_POSIX")
+        day.dateFormat = "yyyy-MM-dd"
+        for (key, id, unit) in kinds {
+            guard let type = HKQuantityType.quantityType(forIdentifier: id) else { continue }
+            group.enter()
+            let q = HKStatisticsCollectionQuery(quantityType: type,
+                                                quantitySamplePredicate: HKQuery.predicateForSamples(withStart: start, end: Date()),
+                                                options: .discreteAverage, anchorDate: start, intervalComponents: DateComponents(day: 1))
+            q.initialResultsHandler = { _, results, _ in
+                var rows: [[Any]] = []
+                results?.enumerateStatistics(from: start, to: Date()) { s, _ in
+                    if let v = s.averageQuantity()?.doubleValue(for: unit) { rows.append([day.string(from: s.startDate), (v * 10).rounded() / 10]) }
+                }
+                lock.lock(); if !rows.isEmpty { out[key] = rows }; lock.unlock()
+                group.leave()
+            }
+            store.execute(q)
+        }
+        group.notify(queue: .main) { done(out) }
+    }
+
     /// Every reading between two moments, oldest first (the set files keep the rest's curve).
     func readings(from start: Date, to end: Date) -> [(Date, Double)] {
         samples.filter { $0.0 >= start && $0.0 <= end }
@@ -59,6 +92,10 @@ final class WorkoutManager: NSObject, ObservableObject, HKWorkoutSessionDelegate
         var share: Set<HKSampleType> = [HKObjectType.workoutType()]
         var read: Set<HKObjectType> = [HKObjectType.workoutType()]
         if let hr = HKObjectType.quantityType(forIdentifier: .heartRate) { read.insert(hr) }
+        // MyGym: resting heart rate and HRV, for today's readiness in the workout report.
+        for id in [HKQuantityTypeIdentifier.restingHeartRate, .heartRateVariabilitySDNN] {
+            if let t = HKObjectType.quantityType(forIdentifier: id) { read.insert(t) }
+        }
         // The calories the workout burned, for the summary at its end (and in Apple Health).
         if let kcal = HKObjectType.quantityType(forIdentifier: .activeEnergyBurned) { share.insert(kcal); read.insert(kcal) }
         store.requestAuthorization(toShare: share, read: read) { ok, _ in
@@ -129,6 +166,11 @@ final class WorkoutManager: NSObject, ObservableObject, HKWorkoutSessionDelegate
     /// running keeps its type.
     func start(workoutId wid: String? = nil, type: String? = nil, opened: HKWorkoutActivityType? = nil) {
         wanted = true
+        // MyGym: ask once for the two readiness types added after Apple Health was switched on.
+        if enabled && !UserDefaults.standard.bool(forKey: "askedReadiness") {
+            UserDefaults.standard.set(true, forKey: "askedReadiness")
+            requestAuthorization { _ in }
+        }
         if let wid = wid { workoutId = wid }
         // Already running (opened by the phone before its workout arrived): only the id to add.
         if session != nil && !prepared { tag(); return }
@@ -312,8 +354,12 @@ final class WorkoutManager: NSObject, ObservableObject, HKWorkoutSessionDelegate
         let endAt = at ?? Date()
         let all = samples.filter { $0.0 <= endAt }.map { $0.1 }
         let hr = Totals(hrAvg: all.isEmpty ? nil : (all.reduce(0, +) / Double(all.count)).rounded(), hrMax: all.max()?.rounded(), calories: nil)
-        // A saved workout's whole heart rate goes to the phone and the server (MotionRecorder).
-        if save { MotionRecorder.sendHeartRate(samples.filter { $0.0 <= endAt }, wid: wid) }
+        // A saved workout's whole heart rate goes to the phone and the server (MotionRecorder),
+        // with the last 35 days' resting heart rate and HRV for the readiness in the report.
+        if save {
+            let readings = samples.filter { $0.0 <= endAt }
+            daily { days in MotionRecorder.sendHeartRate(readings, wid: wid, daily: days) }
+        }
         guard let s = session, let b = builder else {
             if let totals = totals { DispatchQueue.main.async { totals(Totals()) } }
             return

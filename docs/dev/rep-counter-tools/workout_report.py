@@ -104,6 +104,39 @@ def hr_text(h):
 BANDS = [(0, 100), (100, 120), (120, 140), (140, 160), (160, 999)]
 
 
+def readiness(daily, day):
+    """Today against the usual: resting heart rate and HRV (from the watch's Apple Health, in the
+    heart rate file) on `day` (YYYY-MM-DD) against the median of the 28 days before it.
+    A rough guide, not a medical measure."""
+    if not daily:
+        return None
+    out = {}
+    for key in ("rhr", "hrv"):
+        rows = sorted(daily.get(key) or [])
+        today = [v for d, v in rows if d == day]
+        before = [v for d, v in rows if d < day][-28:]
+        if today and len(before) >= 7:
+            out[key] = (today[-1], float(np.median(before)))
+    if not out:
+        return None
+    worse = ("rhr" in out and out["rhr"][0] >= out["rhr"][1] + 5) or ("hrv" in out and out["hrv"][0] <= 0.85 * out["hrv"][1])
+    better = ("rhr" not in out or out["rhr"][0] <= out["rhr"][1] - 3) and ("hrv" not in out or out["hrv"][0] >= 1.1 * out["hrv"][1])
+    out["label"] = "Lower than usual: an easier day may suit you" if worse else ("Better than usual" if better else "Usual")
+    return out
+
+
+def readiness_html(r):
+    if not r:
+        return ""
+    parts = []
+    if "rhr" in r:
+        parts.append(f'resting heart rate {r["rhr"][0]:.0f} bpm (usual {r["rhr"][1]:.0f})')
+    if "hrv" in r:
+        parts.append(f'HRV {r["hrv"][0]:.0f} ms (usual {r["hrv"][1]:.0f})')
+    return (f'<h2>Readiness</h2><p><b>{html.escape(r["label"])}</b><br><span class="dim">'
+            f'{", ".join(parts)}. From Apple Health, against your last 4 weeks; a rough guide only.</span></p>')
+
+
 def hr_section(w, hr_file, motions):
     """The whole workout's heart rate (the watch's file at Finish): a line over time with each
     recorded set shaded, the time spent in each range, and the highest moments with what was on."""
@@ -216,7 +249,9 @@ def report(w, workouts, motions, hr_file=None):
              'the best of the first three; a rising loss means you are near failure. Rest: from Done '
              'to the next Start set. Before: the heart rate in the rest before the set, from its high just '
              'after the last set to the moment you started, and how long it took to fall 20 bpm.</p>')
-    return page(w.get("name") or "Workout", head + hr_section(w, hr_file, motions) + table + notes)
+    day = datetime.fromtimestamp(w["start"] / 1000).strftime("%Y-%m-%d")
+    ready = readiness_html(readiness((hr_file[0] if hr_file else {}).get("daily"), day))
+    return page(w.get("name") or "Workout", head + ready + hr_section(w, hr_file, motions) + table + notes)
 
 
 def last_time(ex_id, w, workouts):
@@ -254,6 +289,93 @@ def page(title, body):
             f'<title>{html.escape(title)}</title><style>{CSS}</style><div class="wrap">{body}</div></html>')
 
 
+def body_part(ex_id):
+    try:
+        return json.load(open(os.path.join(ROOT, "catalogue", "exercises", f"{ex_id}.json")))["bodyPart"]
+    except (OSError, ValueError, KeyError):
+        return "other"
+
+
+def week_of(ms):
+    y, wk, _ = datetime.fromtimestamp(ms / 1000).isocalendar()
+    return f"{y}-W{wk:02d}"
+
+
+def week_numbers(ws, motions, hr_files):
+    """One week's totals."""
+    n = {"workouts": len(ws), "sets": 0, "reps": 0, "volume": 0.0, "parts": {}, "prs": [], "diffs": [],
+         "rests": [], "hr": [], "hot": 0.0, "ready": [], "speed": {}}
+    for w in ws:
+        n["prs"] += [name_of(x) for x in (w.get("prs") or [])]
+        for e in w["entries"]:
+            for s in e["sets"]:
+                if s.get("done"):
+                    r, wt = s.get("r") or 0, s.get("w") or 0
+                    n["sets"] += 1; n["reps"] += r; n["volume"] += r * wt
+                    bp = body_part(e["id"]); n["parts"][bp] = n["parts"].get(bp, 0) + r * wt
+        # sets logged live have a time: the watch's count, speed and real rest (imported ones do not)
+        sets = sorted((s["at"], e["id"], s) for e in w["entries"] for s in e["sets"] if s.get("done") and s.get("at"))
+        for (at, ex, s), nxt in zip(sets, sets[1:] + [None]):
+            r, wt = s.get("r") or 0, s.get("w") or 0
+            meta, a = motions.get((w["id"], ex, round(at)), ({}, None))
+            if a is not None and r:
+                m = motion_of(a)
+                if m:
+                    n["diffs"].append(m["count"] - r)
+                    if m["speeds"]:
+                        best = max(m["speeds"][:3])
+                        key = (ex, wt)
+                        n["speed"][key] = max(n["speed"].get(key, 0), best)
+            if nxt:
+                nm = motions.get((w["id"], nxt[1], round(nxt[0])), ({}, None))[0]
+                gap = ((nm.get("start") or nxt[0]) - at) / 1000
+                if 0 < gap < 900:
+                    n["rests"].append(gap)
+        hf = hr_files.get(w["id"])
+        if hf and hf[1] is not None and len(hf[1]) > 1:
+            b = hf[1][:, 1]; dt = np.minimum(np.diff(hf[1][:, 0], append=hf[1][-1, 0]), 30)
+            n["hr"].append(float(b.mean())); n["hot"] += float(dt[b >= 140].sum()) / 60
+            r = readiness(hf[0].get("daily"), datetime.fromtimestamp(w["start"] / 1000).strftime("%Y-%m-%d"))
+            if r:
+                n["ready"].append((datetime.fromtimestamp(w["start"] / 1000).strftime("%a"), r["label"]))
+    return n
+
+
+def weekly(week, n, prev, earlier_speed):
+    def delta(a, b, fmt="{:+,.0f}"):
+        return f' <span class="dim">({fmt.format(a - b)})</span>' if prev else ""
+    tiles = (f'<div class="tiles"><div><b>{n["workouts"]}</b>workouts{delta(n["workouts"], prev["workouts"] if prev else 0)}</div>'
+             f'<div><b>{n["sets"]}</b>sets{delta(n["sets"], prev["sets"] if prev else 0)}</div>'
+             f'<div><b>{n["reps"]:,.0f}</b>reps</div><div><b>{n["volume"]:,.0f}</b>kg volume'
+             f'{delta(n["volume"], prev["volume"] if prev else 0)}</div></div>')
+    total = sum(n["parts"].values()) or 1
+    parts = "".join(f'<tr><td>{html.escape(k.title())}</td><td>{v:,.0f} kg</td><td>{v / total * 100:.0f}%</td></tr>'
+                    for k, v in sorted(n["parts"].items(), key=lambda kv: -kv[1]))
+    out = f'<h1>Week {week}</h1>{tiles}<h2>Volume by body part</h2><table>{parts}</table>'
+    if n["prs"]:
+        out += '<h2>New records</h2><ul>' + "".join(f'<li>{html.escape(x)}</li>' for x in n["prs"]) + '</ul>'
+    sp = []
+    for (ex, wt), v in sorted(n["speed"].items()):
+        before = earlier_speed.get((ex, wt))
+        if before:
+            sp.append(f'<tr><td>{html.escape(name_of(ex))}</td><td>{wt:g}</td><td>{(v / before - 1) * 100:+.0f}%</td></tr>')
+    if sp:
+        out += ('<h2>Speed at the same weight</h2><p class="dim">Best of the first reps, against the best '
+                'before this week at that weight. Faster at the same weight: stronger.</p><table>' + "".join(sp) + '</table>')
+    if n["rests"]:
+        out += f'<h2>Rest</h2><p>Median {np.median(n["rests"]) / 60:.1f} min between sets (from Done to the next Start set).</p>'
+    if n["hr"]:
+        out += (f'<h2>Heart rate</h2><p>Average {np.mean(n["hr"]):.0f} bpm in workouts, '
+                f'{n["hot"]:.0f} min at 140 bpm or more.</p>')
+    if n["ready"]:
+        out += '<h2>Readiness</h2><ul>' + "".join(f'<li>{d}: {html.escape(l)}</li>' for d, l in n["ready"]) + '</ul>'
+    if n["diffs"]:
+        d = np.array(n["diffs"])
+        out += (f'<h2>Rep counter</h2><p>{len(d)} sets: {np.mean(d == 0) * 100:.0f}% exact, '
+                f'{np.mean(np.abs(d) <= 1) * 100:.0f}% within one rep (against the reps you logged).</p>')
+    return page(f"Week {week}", out)
+
+
 def main():
     every = "--all" in sys.argv
     if "--install-watch" in sys.argv:
@@ -261,7 +383,7 @@ def main():
     out_dir = os.path.join(DATA, "reports")
     os.makedirs(out_dir, exist_ok=True)
     made = 0
-    links = []
+    links, week_links = [], []
     for state_file in sorted(glob.glob(os.path.join(DATA, "state-*.json"))):
         uid = os.path.basename(state_file)[6:-5]
         s = json.load(open(state_file, encoding="utf-8"))
@@ -287,10 +409,24 @@ def main():
                 with open(path, "w", encoding="utf-8") as f:
                     f.write(report(w, workouts, motions, hr_files.get(w["id"])))
                 made += 1
+        # one page per week, the weeks with workouts; the speed "before" grows week by week
+        weeks = {}
+        for w in workouts:
+            weeks.setdefault(week_of(w["start"]), []).append(w)
+        prev, earlier = None, {}
+        for wk in sorted(weeks):
+            n = week_numbers(weeks[wk], motions, hr_files)
+            with open(os.path.join(out_dir, f"week-{wk}.html"), "w", encoding="utf-8") as f:
+                f.write(weekly(wk, n, prev, earlier))
+            week_links.append(wk)
+            for k, v in n["speed"].items():
+                earlier[k] = max(earlier.get(k, 0), v)
+            prev = n
     items = "".join(f'<li><a href="{n}">{datetime.fromtimestamp(t / 1000):%a %d %b %Y}</a> – {html.escape(x)}</li>'
                     for t, n, x in sorted(links, reverse=True))
+    wk_items = "".join(f'<li><a href="week-{w}.html">Week {w}</a></li>' for w in sorted(set(week_links), reverse=True))
     with open(os.path.join(out_dir, "index.html"), "w", encoding="utf-8") as f:
-        f.write(page("Workouts", f'<h1>Workouts</h1><ul>{items}</ul>'))
+        f.write(page("Workouts", f'<h1>Weeks</h1><ul>{wk_items}</ul><h1>Workouts</h1><ul>{items}</ul>'))
     print(f"{made} report(s) written to {out_dir}")
 
 
