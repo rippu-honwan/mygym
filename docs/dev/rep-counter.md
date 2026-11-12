@@ -583,3 +583,29 @@ reps; v2: slow reps). Taking the larger of the two on every scored set: home 10 
 v2), gym a little more overcount (+1 +2 +1 +4 +2 +1 +3 where v1 or v2 alone overcounts).
 Not built: without slow sets of a known count a fusion rule cannot be chosen or checked.
 Asked the user for 2-3 slow sets (about 4 s per rep), the real count put in with the crown before Done.
+
+### Combined count, installed 2026-11-13 (the user chose the two-step plan)
+
+Step 1 (done): the watch counts `max(RepCounter.reps, TiltCounter.reps)` (`MotionRecorder`).
+`TiltCounter.swift` is v1 back under a new name (twin `tilt.py`); `counter2.py` now scores the
+combination (`fused`): home 10 10 10 9, gym 12 whole sets abs 18 (v2 alone 13: max adds both
+overcounts). WatchCore 81 tests. Installed on both devices.
+Step 2 (next, needs the user's sets with true counts, fast AND slow, crown before Done): one fused
+signal (velocity along the axis + attitude change, incl. rotation about the vertical from
+CMAttitude, which gravity cannot see) and counting by periodicity (autocorrelation over the last
+few seconds: the period first, then only swings that keep it). Expected: slow reps by shape not
+size, setup moves dropped as not periodic; cost: reps 1-2 confirmed together at rep 2-3.
+Replay all three on the Mac, keep the best.
+
+Analysis ideas for later (the user asked 2026-11-13; none built). Per rep from the CSV:
+- tempo: up / down / pause times (eccentric vs concentric), time under tension per set
+- velocity loss within a set (mean concentric speed of the last reps vs the first): a standard
+  fatigue / "reps in reserve" marker in velocity-based training; the user's "stops and shakes" = a
+  stall plus tremor (power in ~8-12 Hz of userAcceleration)
+- range of motion per rep (velocity integrated over one rep; tilt range) and its shrinking
+- wrist tilt / roll during a rep where it should stay still (the user's grip/form idea)
+- left-right / path consistency rep to rep, a jerky vs smooth movement (jerk)
+- rest length vs reps of the next set, heart rate recovery between sets (HR is already logged)
+- per exercise over weeks: speed at the same weight rising = getting stronger (load-velocity profile)
+Caveat for all of it: one watch on one wrist, no position, so these are relative within the user's
+own data, not absolute numbers.
