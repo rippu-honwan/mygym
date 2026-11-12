@@ -85,6 +85,12 @@ def run(t, a, g, **kw):
     for i in range(len(t)): c.push(t[i], a[i], g[i])
     return c
 
+def fused(t, a, g, **kw):
+    """What the watch counts (MotionRecorder): the larger of the speed and the tilt counter.
+    Speed misses slow reps (they barely accelerate), tilt misses reps that hardly turn the wrist."""
+    from tilt import run as tilt
+    return max(run(t, a, g, **kw).reps, tilt(t, g).reps)
+
 if __name__ == "__main__":
     import glob, os, sys, json
     D = os.path.expanduser("~/dev/mygym/data/motion/" + os.environ["MYGYM_UID"])
@@ -99,5 +105,5 @@ if __name__ == "__main__":
         out = []; tot = 0
         for k, tr in T.items():
             x = np.genfromtxt(glob.glob(f"{D}/*{k}.csv")[0], delimiter=",", skip_header=2)
-            e = run(x[:,0], x[:,1:4], x[:,7:10], **kw).reps - tr; out.append(f"{e:+d}"); tot += abs(e)
+            e = fused(x[:,0], x[:,1:4], x[:,7:10], **kw) - tr; out.append(f"{e:+d}"); tot += abs(e)
         print(f"{name:10s} abs {tot:3d} | " + " ".join(out))

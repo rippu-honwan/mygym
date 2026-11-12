@@ -26,6 +26,8 @@ final class MotionRecorder {
     /// Counts the reps of the set being recorded, sample by sample (WatchCore RepCounter); only
     /// touched on `queue`.
     private var counter = RepCounter()
+    /// The second counter, on the wrist's tilt: it sees slow reps the speed counter misses.
+    private var tilt = TiltCounter()
     /// A rep was counted; called on the main queue.
     var onRep: (() -> Void)?
 
@@ -43,6 +45,7 @@ final class MotionRecorder {
         queue.addOperation { [weak self] in
             self?.samples = []
             self?.counter = RepCounter()
+            self?.tilt = TiltCounter()
         }
         MotionRecorder.resendLeftovers()
         manager.deviceMotionUpdateInterval = 1 / MotionLog.hz
@@ -55,9 +58,13 @@ final class MotionRecorder {
             let s = MotionSample(t: bootAt + m.timestamp, ax: a.x, ay: a.y, az: a.z,
                                  rx: r.x, ry: r.y, rz: r.z, gx: g.x, gy: g.y, gz: g.z)
             self.samples.append(s)
-            let before = self.counter.reps
-            // Two at once when the counter finds that the reps changed (RepCounter.swing).
-            for _ in before..<self.counter.push(t: s.t, ax: s.ax, ay: s.ay, az: s.az) {
+            // The larger of the two counts (docs/dev/rep-counter.md): speed misses slow reps,
+            // tilt misses reps that hardly turn the wrist. Two at once when one counter jumps.
+            // ponytail: max adds up both counters' overcounts; a fused signal is the next step.
+            let before = max(self.counter.reps, self.tilt.reps)
+            self.counter.push(t: s.t, ax: s.ax, ay: s.ay, az: s.az)
+            _ = self.tilt.push(t: s.t, gx: s.gx, gy: s.gy, gz: s.gz)
+            for _ in before..<max(self.counter.reps, self.tilt.reps) {
                 DispatchQueue.main.async { self.onRep?() }
             }
             if self.samples.count > cap { MotionLog.trim(&self.samples, now: s.t) }
