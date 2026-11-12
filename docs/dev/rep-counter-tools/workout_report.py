@@ -83,6 +83,20 @@ def bars(speeds):
     return f'<svg class="bars" width="{len(speeds) * (w + 2)}" height="24" aria-hidden="true">{rects}</svg>'
 
 
+def recovery(curve):
+    """The rest before a set, from its file's heart rate curve ([seconds from Start set, bpm]; the
+    rest is before 0): the highest reading in its first 30 s, the last one before the set, and how
+    long it took to fall 20 bpm from that high."""
+    rest = [(t, b) for t, b in (curve or []) if t < 0]
+    if len(rest) < 3:
+        return None
+    t0 = rest[0][0]
+    hi_t, hi = max([x for x in rest if x[0] <= t0 + 30], key=lambda x: x[1])
+    end = rest[-1][1]
+    down = next((t - hi_t for t, b in rest if t > hi_t and b <= hi - 20), None)
+    return {"high": hi, "end": end, "down20": down}
+
+
 def hr_text(h):
     return f'{h["avg"]:.0f} / {h["max"]:.0f}' if h else "–"
 
@@ -122,12 +136,17 @@ def report(w, workouts, motions):
                 watch = f'<span class="off">{counted} ({counted - reps:+d})</span>'
             loss = f'{m["loss"] * 100:.0f}%' if m and "loss" in m else "–"
             tempo = f'{m["tempo"]:.1f} s' if m and "tempo" in m else "–"
+            rec = recovery(meta.get("hrCurve"))
+            rec_t = ""
+            if rec:
+                d = f', -20 in {rec["down20"]:.0f} s' if rec["down20"] is not None else ", never -20"
+                rec_t = f'<br><span class="dim">before: {rec["high"]:.0f} to {rec["end"]:.0f}{d}</span>'
             rest = nxt.get((ei, si))
             rest_t = f'{rest / 60:.0f}:{rest % 60:02.0f}' if rest else "–"
             rows.append(
                 f'<tr><td>{si + 1}</td><td>{weight:g}</td><td>{reps:g}</td><td>{watch}</td>'
                 f'<td>{bars(m["speeds"]) if m else ""}</td><td>{loss}</td><td>{tempo}</td>'
-                f'<td>{hr_text(s.get("hr"))}<br><span class="dim">rest {hr_text(s.get("restHr"))} · {rest_t}</span></td></tr>')
+                f'<td>{hr_text(s.get("hr"))}<br><span class="dim">rest {hr_text(s.get("restHr"))} · {rest_t}</span>{rec_t}</td></tr>')
     mins = (w["end"] - w["start"]) / 60000 if w.get("end") and w.get("start") else 0
     day = datetime.fromtimestamp(w["start"] / 1000).strftime("%a %d %b %Y")
     head = (f'<h1>{html.escape(w.get("name") or "Workout")}</h1><p class="dim">{day}, '
@@ -140,7 +159,8 @@ def report(w, workouts, motions):
     notes = ('<p class="dim">Watch: what the watch counted (difference to the reps logged). Rep speed: '
              'one bar per rep, relative to the set\'s fastest. Speed loss: the last two reps against '
              'the best of the first three; a rising loss means you are near failure. Rest: from Done '
-             'to the next Start set.</p>')
+             'to the next Start set. Before: the heart rate in the rest before the set, from its high just '
+             'after the last set to the moment you started, and how long it took to fall 20 bpm.</p>')
     return page(w.get("name") or "Workout", head + table + notes)
 
 

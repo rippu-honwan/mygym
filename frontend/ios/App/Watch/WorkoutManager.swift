@@ -40,6 +40,11 @@ final class WorkoutManager: NSObject, ObservableObject, HKWorkoutSessionDelegate
     /// A workout to measure (started here or picked up), even before the permission answer.
     private var wanted = false
 
+    /// Every reading between two moments, oldest first (the set files keep the rest's curve).
+    func readings(from start: Date, to end: Date) -> [(Date, Double)] {
+        samples.filter { $0.0 >= start && $0.0 <= end }
+    }
+
     /// { avg, max } over a stretch of the session, or nil without readings in it.
     func stats(from start: Date, to end: Date) -> [String: Double]? {
         let inside = samples.filter { $0.0 >= start && $0.0 <= end }.map { $0.1 }

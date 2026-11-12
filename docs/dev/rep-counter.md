@@ -662,3 +662,12 @@ Need the counter to be right first (Phase 3 data):
   (LaunchAgent on `data/motion` and the state file), also to be turned on by the user.
 - 2026-11-13: first real run of `install-devices.sh`: iPhone and watch installed at the first try,
   signed until 2026-11-20 02:05; the user opened the watch app, sync works (watch follows).
+
+### Heart-rate rest, step 1: record the curve (2026-11-13, installed)
+
+Each set file's metadata now has `hrCurve`: every heart rate reading from the last Done (at most
+10 min back) to this Done, as `[seconds from Start set, bpm]` (negative = the rest before the
+set). `WorkoutManager.readings(from:to:)`. Only sets with a motion file get it (not leg sets).
+The report shows per set "before: <high after the last set> to <at Start set>, -20 in N s".
+Step 2 after the next gym session: pick the rule (drop in bpm from the high, min / max rest) from
+these curves; then a phone setting and the watch's "ready" tap.

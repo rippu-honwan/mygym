@@ -486,6 +486,7 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
         guard let w = workout, let e = entry, let si = setIndex else { return }
         // A double tap on Done (a sweaty finger) is one set, not this one and the next.
         if heldFor == nil, let last = lastTick, Date().timeIntervalSince(last) < 0.7 { return }
+        let doneBefore = lastTick
         // In a superset the page flips to the partner: a slower second tap would log its set.
         if heldFor == nil, !touchAllowed { return }
         lastTick = Date()
@@ -522,6 +523,12 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
             if let id = event?["id"] { meta["id"] = id }
             // What the counter said, next to the reps logged: how good it is, set by set.
             meta["auto"] = autoReps
+            // The heart rate from the last Done (the rest before this set, at most 10 min) to this
+            // one, as [seconds from Start set, bpm]: to tune a rest that ends by heart rate.
+            let hrFrom = max(doneBefore ?? since.addingTimeInterval(-300), since.addingTimeInterval(-600))
+            let curve = health.readings(from: hrFrom, to: now)
+                .map { [($0.0.timeIntervalSince(since) * 10).rounded() / 10, $0.1.rounded()] }
+            if !curve.isEmpty { meta["hrCurve"] = curve }
             if let goal = repGoal { meta["goal"] = goal }
             health.motion.send(entry: e, set: si, from: since, to: now, meta: meta)
         }
