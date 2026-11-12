@@ -170,6 +170,8 @@ struct RoundButton: View {
     var size: CGFloat = 76
     /// The label under the button, said in words (on by default: "Done" under the check).
     var caption = true
+    /// MyGym: the Apple Watch double tap presses this button (it must sit on the Button itself).
+    var doubleTap = false
     let action: () -> Void
     @Environment(\.isLuminanceReduced) private var dimmed
 
@@ -185,6 +187,7 @@ struct RoundButton: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel(label)
+            .primaryDoubleTap(doubleTap)
             // The word under it in the accent too, so Done reads as the one thing to press.
             if caption { label.font(.caption2.weight(.bold)).foregroundStyle(dimmed ? Color.secondary : Theme.accent).lineLimit(1) }
         }
@@ -416,8 +419,8 @@ struct ExerciseList: View {
 extension View {
     /// MyGym: the Apple Watch double tap (thumb and finger, watchOS 11, Series 9 and later) presses
     /// this button: Start set and Done without the other hand.
-    @ViewBuilder func primaryDoubleTap() -> some View {
-        if #available(watchOS 11.0, *) { self.handGestureShortcut(.primaryAction) } else { self }
+    @ViewBuilder func primaryDoubleTap(_ on: Bool = true) -> some View {
+        if on, #available(watchOS 11.0, *) { self.handGestureShortcut(.primaryAction) } else { self }
     }
 }
 
@@ -562,6 +565,9 @@ struct ExercisePage: View {
                                   tint: .white, large: true) { if current { editing = .seconds } }
                     } else {
                         numbers(entry, row, unit: entry.weightUnit(w.unit), current: current)
+                    }
+                    if current && store.fatigueWarned {
+                        Tag(text: Text(verbatim: "Slowing down"), color: .orange).padding(.bottom, 2)
                     }
                     if let over = store.restOverSince {
                         // MyGym: the rest ran out and the next set has not started: how long ago, in red.
@@ -743,18 +749,16 @@ struct ExercisePage: View {
             } else if current && store.recordsMotion(entry) && store.recordingSince == nil {
                 // Rep counter: the sensor records only from Start set to Done (MotionRecorder).
                 RoundButton(systemImage: "play.fill", label: Text("Start set"), size: doneSize,
-                            caption: !typeSize.isAccessibilitySize) { store.startSet() }
-                    .primaryDoubleTap()
+                            caption: !typeSize.isAccessibilitySize, doubleTap: current) { store.startSet() }
             } else {
                 // At the accessibility sizes the word under the check goes (VoiceOver still says it):
                 // the room it takes is what pushed the page up into the clock on 41 mm.
                 RoundButton(systemImage: "checkmark", label: Text("Done"), size: doneSize,
-                            caption: !typeSize.isAccessibilitySize) { store.completeSet() }
-                    .primaryDoubleTap()
+                            caption: !typeSize.isAccessibilitySize, doubleTap: current) { store.completeSet() }
                     // Auto-end (setting): the set ends when this ring has run out; a tap stops it.
                     .overlay {
                         if current, let at = store.autoEndAt {
-                            CountdownRing(start: at.addingTimeInterval(-3), end: at, color: .orange)
+                            CountdownRing(start: at.addingTimeInterval(-SessionStore.autoEndCountdown), end: at, color: .orange)
                                 .frame(width: doneSize + 10, height: doneSize + 10)
                                 .allowsHitTesting(false)
                         }

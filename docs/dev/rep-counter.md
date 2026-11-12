@@ -747,3 +747,21 @@ NOT yet verified on the devices: double tap, fatigue taps, auto-end, the readine
   of labelled data), form analysis (wrist roll, path consistency), sync away from home
   (Tailscale), Colima starting with the Mac, readiness on the watch at workout start.
 - Backup destination: iCloud Drive/MyGym-backup (the user's choice, 2026-11-13); first backup made (2.2 MB). The daily job (--install) is for the user to turn on.
+
+### Device test of the night build (2026-11-13 03:05) and fixes
+
+The user's test (2 short workouts, discarded, so no HR file): double tap seen by the watch but
+the app did nothing; fatigue alert never felt; auto-end slow or none. The watch HAD the settings
+(`fatigue 0.3`, `autoEnd true` in its saved state, read from the watch container's preferences).
+Causes and fixes (installed):
+- Double tap: `handGestureShortcut` was on RoundButton (a VStack), it must be on the Button.
+- Auto-end: the countdown was cancelled by any move, so raising the wrist to look at it reset
+  it; 4 s still + 3 s ring was also slow. Now: still >= 2 s and no rep for 2 s -> 2 s ring; only a
+  new rep or a tap stops it. `completeSet(auto:)` skips the touch guard.
+- Fatigue: the replay shows the rule did fire late (set 2 at 49.7 s): the user's very slow reps
+  (5-10 s each) are invisible to both counters (no acceleration swing, little tilt), so they were
+  never counted. A rule on every swing fired on most sets (re-rack moves), dropped. Now the alert
+  is two `.notification` taps plus an orange "Slowing down" tag. Real fatigue (a heavy last rep)
+  must be tried at the gym; deliberately slow reps are not the same signal.
+- Each set file now has `helpers: {fatigue, autoEnd, log: [[s, "autoEndRing"|"autoEndRep"|
+  "autoEndTap"|"autoEnd"|"fatigue"], ...]}` to see on the Mac what the watch did.

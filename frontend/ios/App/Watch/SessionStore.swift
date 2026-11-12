@@ -276,6 +276,8 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
         fatigueWarned = false
         autoEndAt = nil
         autoEndHeld = false
+        setLog = []
+        lastRepAt = nil
         autoEndTimer?.invalidate()
         if state.settings.autoEnd == true {
             autoEndTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
@@ -285,16 +287,27 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
         WKInterfaceDevice.current().play(.start)
     }
 
-    /// Auto-end (setting): after a rep and 3 s into the set, 4 s of a still wrist start a 3 s
-    /// countdown on Done; moving again stops it, a tap cancels it, at 0 the set is done.
+    /// Auto-end (setting): after a rep and 3 s into the set, a still wrist for `autoEndStill` s with
+    /// no rep starts a `autoEndCountdown` s ring on Done. Only a new rep or a tap stops it, not a
+    /// move: raising the wrist to look at the ring must not cancel it. At 0 the set is done.
+    // ponytail: 2 s + 2 s, the user found 4 s + 3 s slow (2026-11-13); a pause at lockout longer
+    // than 2 s starts the ring, which the next rep stops.
     private func checkAutoEnd() {
         guard let since = recordingSince, autoReps >= 1, Date().timeIntervalSince(since) >= 3 else { return }
-        let still = health.motion.status().still
-        if still < 1 { autoEndHeld = false; autoEndAt = nil; return }
         if let at = autoEndAt {
-            if Date() >= at { autoEndAt = nil; completeSet() }
-        } else if still >= 4 && !autoEndHeld {
-            autoEndAt = Date().addingTimeInterval(3)
+            if Date() >= at {
+                autoEndAt = nil
+                note("autoEnd")
+                completeSet(auto: true)
+            }
+            return
+        }
+        let quiet = lastRepAt.map { Date().timeIntervalSince($0) } ?? 99
+        let still = health.motion.status().still
+        if still < 0.5 { autoEndHeld = false }
+        if still >= SessionStore.autoEndStill && quiet >= SessionStore.autoEndStill && !autoEndHeld {
+            autoEndAt = Date().addingTimeInterval(SessionStore.autoEndCountdown)
+            note("autoEndRing")
             WKInterfaceDevice.current().play(.click)
         }
     }
@@ -304,6 +317,7 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
         guard autoEndAt != nil else { return }
         autoEndAt = nil
         autoEndHeld = true
+        note("autoEndTap")
     }
 
     /// MyGym: when a still wrist ends the set by itself (a countdown on Done); nil: not counting down.
@@ -311,8 +325,18 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
     /// The lifter cancelled the countdown: no new one until the wrist moves again.
     private var autoEndHeld = false
     private var autoEndTimer: Timer?
-    /// The fatigue tap came in this set already.
-    private var fatigueWarned = false
+    /// The fatigue alert came in this set already (the page shows "Slowing down").
+    @Published private(set) var fatigueWarned = false
+    /// What the rep counter's helpers did in this set, [seconds from Start set, what]: kept in the
+    /// set file to see on the Mac why they did or did not act.
+    private var setLog: [[Any]] = []
+    private func note(_ what: String) {
+        guard let since = recordingSince else { return }
+        setLog.append([(Date().timeIntervalSince(since) * 10).rounded() / 10, what])
+    }
+    /// Auto-end: seconds of a still wrist (and no rep) before the countdown, and the countdown.
+    static let autoEndStill = 2.0, autoEndCountdown = 2.0
+    private var lastRepAt: Date?
 
     /// While a set is recorded: the reps planned for it (the tile shows the count instead).
     @Published private(set) var repGoal: Double?
@@ -325,6 +349,8 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
         guard recordingSince != nil else { return }
         autoReps += 1
         reps += 1
+        lastRepAt = Date()
+        if autoEndAt != nil { autoEndAt = nil; note("autoEndRep") }
         // ponytail: which taps are felt mid-set is the user's to say; these are a first pick.
         WKInterfaceDevice.current().play(reps == repGoal ? .success : .directionUp)
         // Fatigue (setting): once per set, two taps apart from the rep's own.
@@ -332,7 +358,9 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
             let st = health.motion.status()
             if SetSpeed.fatigued(sizes: st.sizes, times: st.times, limit: limit) {
                 fatigueWarned = true
-                for d in [0.35, 0.7] { DispatchQueue.main.asyncAfter(deadline: .now() + d) { WKInterfaceDevice.current().play(.retry) } }
+                note("fatigue")
+                // stronger than a rep's tap, and twice
+                for d in [0.4, 0.9] { DispatchQueue.main.asyncAfter(deadline: .now() + d) { WKInterfaceDevice.current().play(.notification) } }
             }
         }
     }
@@ -531,13 +559,13 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
 
     /// The set up next, done: the numbers on the screen (a hold's seconds as it lasted, one side of
     /// a per-side set, nothing for cardio), then where SessionCore.next says, with a rest when due.
-    func completeSet(sec heldFor: Double? = nil) {
+    func completeSet(sec heldFor: Double? = nil, auto: Bool = false) {
         guard let w = workout, let e = entry, let si = setIndex else { return }
         // A double tap on Done (a sweaty finger) is one set, not this one and the next.
         if heldFor == nil, let last = lastTick, Date().timeIntervalSince(last) < 0.7 { return }
         let doneBefore = lastTick
         // In a superset the page flips to the partner: a slower second tap would log its set.
-        if heldFor == nil, !touchAllowed { return }
+        if heldFor == nil, !auto, !touchAllowed { return }
         lastTick = Date()
         restOverSince = nil
         ackRestOver()
@@ -576,6 +604,8 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
             // What the counter said, next to the reps logged: how good it is, set by set.
             meta["auto"] = autoReps
             if let v = vel { meta["vel"] = v }
+            // what the helpers did, and with which settings (MyGym)
+            meta["helpers"] = ["fatigue": state.settings.fatigue ?? 0, "autoEnd": state.settings.autoEnd ?? false, "log": setLog]
             // The heart rate from the last Done (the rest before this set, at most 10 min) to this
             // one, as [seconds from Start set, bpm]: to tune a rest that ends by heart rate.
             let hrFrom = max(doneBefore ?? since.addingTimeInterval(-300), since.addingTimeInterval(-600))
