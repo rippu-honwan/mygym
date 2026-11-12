@@ -644,3 +644,19 @@ Need the counter to be right first (Phase 3 data):
 7. Weight suggestion (last, needs weeks of `vel` history): in `progression.js nextPrescription`,
    for reps policies: target reps hit and velocity loss below a threshold -> raise as now; loss
    high -> hold. Thresholds are a setting; the published VBT ranges are a starting point only.
+
+### Built 2026-11-13: one-click install and the post-workout report
+
+- `scripts/ios/install-devices.sh` (+ `--renew`, `--build-only`, `--install-reminder`): tested
+  build-only and renew. Renewing works with a free Apple ID: deleting the app's cached profiles
+  (Xcode UserData) and building with `-allowProvisioningUpdates` gave new 7-day profiles
+  (now to 2026-11-20). NOT yet installed with it (needs the iPhone unlocked at home).
+  Logs in `~/Library/Logs/MyGym/` (cap sync deletes `build/`). Team id in the ignored
+  `scripts/ios/local.env`. `installed-until` there records the expiry of what is on the devices.
+- `scripts/ios/profile-reminder.sh`: notification within 48 h of that expiry. The daily
+  LaunchAgent (`--install`) must be turned on by the user; the assistant's tool blocked it.
+- `docs/dev/rep-counter-tools/workout_report.py`: HTML per workout in `data/reports/` (+ index),
+  16 written. Per set: weight, reps, the watch's count (same rule as the watch: max of speed and
+  tilt counter) and its difference, rep speed bars, velocity loss (last 2 vs best of first 3),
+  tempo, HR set and rest, real rest (Done to the next Start set). Auto run: `--install-watch`
+  (LaunchAgent on `data/motion` and the state file), also to be turned on by the user.

@@ -24,7 +24,7 @@ class RepCounter2:
         s.state = 0; s.top = 0.0; s.bottom = 0.0; s.last = None; s.quiet = None; s.tail = tail
         s.sizes = []; s.periods = []     # of the swings counted in the current run
         s.odd = None                     # a swing that did not fit: (size, period)
-        s.reps = 0; s.events = []
+        s.reps = 0; s.events = []; s.rep_sizes = []   # per counted rep: its swing size (a speed)
     def push(s, t, a, g):
         a = np.asarray(a, float)*9.81
         if s.mode == "vert":
@@ -66,18 +66,18 @@ class RepCounter2:
     def _swing(s, size, period, t):
         if size < s.min_pp: return
         if not s.sizes:
-            s.sizes = [size]; s.periods = []; s.reps += 1; s.events.append(t); return
+            s.sizes = [size]; s.periods = []; s.reps += 1; s.events.append(t); s.rep_sizes.append(size); return
         if s._like(size, period, s.sizes, s.periods, s.lo, s.hi, s.plo, s.phi):
             s.sizes.append(size); s.odd = None
             if period is not None: s.periods.append(period)
-            s.reps += 1; s.events.append(t); return
+            s.reps += 1; s.events.append(t); s.rep_sizes.append(size); return
         if len(s.sizes) == 1:
             # the lone first swing was getting into position: this one starts the count
-            s.sizes = [size]; s.periods = []; s.odd = None; s.events[-1] = t; return
+            s.sizes = [size]; s.periods = []; s.odd = None; s.events[-1] = t; s.rep_sizes[-1] = size; return
         if s.odd is not None and s._like(size, None, [s.odd[0]], [], s.lo, s.hi, s.plo, s.phi):
             # two alike in a row that are not like the reps before: the reps changed, both count
             s.sizes = [s.odd[0], size]; s.periods = [period] if period else []; s.odd = None
-            s.reps += 2; s.events += [t, t]; return
+            s.reps += 2; s.events += [t, t]; s.rep_sizes += [s.sizes[0], size]; return
         s.odd = (size, period)
 
 def run(t, a, g, **kw):
