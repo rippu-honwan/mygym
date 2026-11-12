@@ -27,7 +27,7 @@ enum SetSpeed {
 }
 
 /// How long the wrist has been still: the acceleration's RMS over about half a second under `floor`.
-/// Measured on Ken's sets: still 0.02-0.04 g, lifting 0.1-0.6 g.
+/// Measured on the user's sets: still 0.02-0.04 g, lifting 0.1-0.6 g.
 struct Stillness {
     static let floor = 0.06
     private(set) var stillSince: Double?
