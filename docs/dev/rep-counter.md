@@ -609,3 +609,38 @@ Analysis ideas for later (the user asked 2026-11-13; none built). Per rep from t
 - per exercise over weeks: speed at the same weight rising = getting stronger (load-velocity profile)
 Caveat for all of it: one watch on one wrist, no position, so these are relative within the user's
 own data, not absolute numbers.
+
+## Next features: research (2026-11-13, nothing built)
+
+The user asked for six. Grouped by what they depend on.
+
+Can start now:
+1. One-click install (`scripts/ios/install-devices.sh`): build:mobile only when `frontend/src`
+   changed since the last build, xcodebuild with `-allowProvisioningUpdates` (renews the free
+   7-day profiles), print each embedded profile's expiry, devicectl install iPhone then the
+   embedded watch app with retries, then ask to open the watch app by hand. Plus a launchd job
+   that posts a macOS notification two days before the earliest expiry.
+2. Post-workout report: a Python script (same signal code as `counter2.py`) builds one HTML file
+   per workout in `data/reports/` from `state-<uid>.json` + the set CSVs: sets, volume, change vs
+   last time, counter vs logged reps, per rep: speed, tempo, velocity loss per set; heart rate per
+   set and rest, real rest length (the 2026-11-11 sets were 150-360 s apart with a 90 s timer).
+   Trigger: launchd `WatchPaths` on `data/motion/<uid>`; an AI written summary can be added later
+   (MCP server already reads `data/`).
+3. Heart-rate rest: the watch has the live readings (`WorkoutManager.samples`). Rest is "ready"
+   when HR has fallen a set number of bpm below the set's peak, bounded by a min and a max rest.
+   2026-11-11: set peaks 109-149, rest averages 105-131, so only a relative rule can work; only
+   avg/max are stored now, so first record the rest's HR curve (seconds, bpm) in the next set's
+   CSV metadata to tune the drop. Setting on the phone (WatchSettings), off by default.
+
+Need the counter to be right first (Phase 3 data):
+4. Velocity per set: `RepCounter` keeps each counted swing's size (peak-to-peak velocity). At Done
+   the watch adds `vel: {first, last, loss}` to the tick event (like `hr`); the phone stores extra
+   set fields as they come (`watch-sync.js` write). Only valid when the velocity counter counted.
+5. Fatigue alert: live, a distinct haptic when a rep's swing is a set % below the best of the
+   first two reps (setting, e.g. 30%); also a rep taking > 2x the median time (a grind).
+6. Auto-end a set: after >= 1 rep, the wrist still (acceleration RMS low) for ~4 s -> "Done in
+   3 s" with a tap to cancel, then Done with the counted reps. Risk: a pause at lockout
+   (rest-pause); hence the cancel window and a setting.
+7. Weight suggestion (last, needs weeks of `vel` history): in `progression.js nextPrescription`,
+   for reps policies: target reps hit and velocity loss below a threshold -> raise as now; loss
+   high -> hold. Thresholds are a setting; the published VBT ranges are a starting point only.
