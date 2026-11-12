@@ -660,3 +660,5 @@ Need the counter to be right first (Phase 3 data):
   tilt counter) and its difference, rep speed bars, velocity loss (last 2 vs best of first 3),
   tempo, HR set and rest, real rest (Done to the next Start set). Auto run: `--install-watch`
   (LaunchAgent on `data/motion` and the state file), also to be turned on by the user.
+- 2026-11-13: first real run of `install-devices.sh`: iPhone and watch installed at the first try,
+  signed until 2026-11-20 02:05; the user opened the watch app, sync works (watch follows).
