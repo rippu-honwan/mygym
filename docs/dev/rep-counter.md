@@ -707,3 +707,42 @@ Paths found in the code:
    for the exercise: target reps met and loss < low threshold (fresh) -> raise as the policy does
    now, even a double-progression one that would wait; loss > high threshold -> hold the weight.
    Thresholds per profile setting; needs weeks of `vel` data and a unit test (CONTRIBUTING rule).
+
+## Built 2026-11-13 (night): speed, fatigue, auto-end, double tap, backup, weekly, readiness, merge
+
+- Phone storage (the user asked): the iPhone keeps a set file only until the server took it
+  (`motion-upload.js` deletes after the PUT); the watch's outbox only until the transfer
+  finished. Found 7 files waiting on the iPhone: the server was DOWN (Colima stopped after a Mac
+  restart); started again (`colima start`, `docker compose up -d`) and they went up. Workout
+  records (exercise, weight, reps) stay in the app: a few KB. Colima does not start by itself.
+- `SetSpeed` (WatchCore): set summary `{best, last, loss}` -> tick event `vel` (phone keeps it:
+  `watch-sync.js velFrom`) and the set file. Fatigue: last rep `limit` slower than the best of the
+  first 3, or a grind (> 2x the median gap), two `.retry` taps once per set. `Stillness`: RMS of
+  userAcceleration (0.5 s) under 0.06 g. Auto-end: after a rep and 3 s, 4 s still -> 3 s orange
+  ring on Done, a tap cancels (until the wrist moves), then Done. Double tap (watchOS 11):
+  `handGestureShortcut(.primaryAction)` on Start set and Done.
+- Phone Settings > Apple Watch > "Rep counter": Fatigue alert (Off / 20 / 30 / 40 % slower),
+  "End a set when the wrist is still". Both off by default; English labels (fork rule).
+- `scripts/backup-data.sh`: tar + openssl AES-256 with `~/.config/mygym/backup.key` (made on first
+  run, 0600), 30 days kept, `--restore`, `--install` (daily 03:00, the user turns it on).
+  Destination MYGYM_BACKUP_DIR, default iCloud Drive/MyGym-backup. Tested backup + restore (identical).
+- Report: Readiness (resting HR and HRV from Apple Health, sent with the workout's HR file as
+  `daily`, against the median of the 28 days before; worse: RHR +5 bpm or HRV -15 %); weekly pages
+  `week-YYYY-Www.html` (volume and by body part vs last week, records, speed at the same weight
+  vs before, median real rest, HR, readiness, counter accuracy). The watch asks Apple Health once
+  for the two new types at the next workout start.
+- Merged openGym upstream (3 commits, a Cloudflare fallback for their website; .gitignore
+  conflict kept both). Tests: WatchCore 85, frontend 7839 (+ the known local app-icons), api 801,
+  cloudflare 7. Installed on both devices.
+NOT yet verified on the devices: double tap, fatigue taps, auto-end, the readiness permission.
+
+## Future plan (not built, decide later)
+
+- Heart-rate rest (needs the next sessions' `hrCurve`): ready when HR fell a set drop from the
+  high since Done; min 45 s, max the rest timer; a phone setting.
+- Weight suggestion from `vel` (needs weeks of it): raise when target reps met and loss low,
+  hold when high; in `progression.js nextPrescription`, with a unit test.
+- Rep counter v3: one fused signal and counting by periodicity (needs sets with true counts).
+- Tempo coach (haptic beat per exercise), data cleaning flags, exercise auto-recognition (months
+  of labelled data), form analysis (wrist roll, path consistency), sync away from home
+  (Tailscale), Colima starting with the Mac, readiness on the watch at workout start.
