@@ -198,3 +198,6 @@ MyGym is a personal fork with Apple Watch rep counting; read `docs/dev/rep-count
 - Commit messages: English, short and precise. One subject line with a type prefix
   (`feat:`, `fix:`, `docs:`, `build:`, `test:`), at most a few short body lines when needed.
 - Push only to `origin` (this fork), feature branches; never push to `upstream` (openGym).
+- This fork is public: no personal details in tracked files or commits (device UDIDs, Apple team
+  id, real names, hostnames, server user ids, emails). Use placeholders such as `<watch UDID>`,
+  `<TEAM_ID>`, `<uid>`. The commit author email is the GitHub noreply address.
