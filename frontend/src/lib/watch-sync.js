@@ -368,7 +368,8 @@ export function restFromWatch (ev, ui = restStore?.getState?.()) {
 export function recordingFromWatch (ev, store = restStore) {
   if (!store?.setState) return
   const entryIdx = num(ev.entryIdx), setIdx = num(ev.setIdx)
-  if (ev.on === true && entryIdx != null && setIdx != null) store.setState({ watchRec: { entryIdx, setIdx, at: num(ev.at) || Date.now() } })
+  // the watch has the press: the Start in the snapshot is done with
+  if (ev.on === true && entryIdx != null && setIdx != null) store.setState({ watchRec: { entryIdx, setIdx, at: num(ev.at) || Date.now() }, watchStart: null })
   else store.setState({ watchRec: null, watchStart: null })
 }
 
@@ -496,8 +497,12 @@ const storeReady = () => getStateRef?.()?.ready !== false
  * Takes what the watch sent from the native queue, applies it, and acknowledges what is done, but
  * only once the change is on disk (the store's saveNow): the queue is the event's last copy.
  */
+let drainAgain = false
 export function drainWatchEvents () {
-  if (draining) return draining
+  // MyGym: an event that comes in while a drain runs is drained right after it, not left waiting
+  // for the next one (a "recording off" sat 10 s behind its set, sync log 2026-11-14).
+  if (draining) { drainAgain = true; return draining }
+  drainAgain = false
   draining = (async () => {
     try {
       const native = await watchPlugin()
@@ -516,7 +521,10 @@ export function drainWatchEvents () {
         } catch { /* not now: the next drain tries again */ }
       }
       return all
-    } catch { return [] } finally { draining = null }
+    } catch { return [] } finally {
+      draining = null
+      if (drainAgain) { drainAgain = false; setTimeout(drainWatchEvents, 0) }
+    }
   })()
   return draining
 }

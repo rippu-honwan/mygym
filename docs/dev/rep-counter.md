@@ -829,3 +829,16 @@ event it sends (`<start>_watchlog_s0.csv` per workout). Both land in `data/motio
 report skips them.
 Per side switch: in the routine editor, tap the exercise -> Exercise settings sheet, near the end
 under "Bodyweight": "Per side" (zh-TW 單側). The user did not find it yet.
+- Sync logs read (2026-11-14 02:34-02:36): (1) the phone drained the watch's events only once
+  per trigger: an event that came during a drain waited for the next one ("recording off" came
+  2-10 s late, so the phone showed Recording after the rest was skipped). Fixed: a drain asked for
+  during one runs again right after (`drainAgain`). (2) The phone's Skip 4.7 s into the rest was
+  ignored by the watch's 5 s guard. Now the watch ends its rest when the phone's snapshot has no
+  rest AND already shows the set the watch ticked as done (`restAfterTick`); a rest the phone
+  started is followed at once. The phone's Start leaves the snapshot once the watch says it
+  records (`watchStart: null`).
+- Per side set on the server for the user (2026-11-14, state file edited with a backup, `_rev`
+  123 -> 124, routine `_ts` and `_f.ex` stamped so the phone's merge takes it): 0192 cable one arm
+  lateral raise (Limbs A, Torso B, Limbs B), 1350 lever seated row (Torso A, Torso B), 1454 lever
+  seated shoulder press (Limbs B). Reps doubled to totals (openGym's per-side target is both sides
+  together): e.g. 3 x 8-12 per arm -> 16-24.

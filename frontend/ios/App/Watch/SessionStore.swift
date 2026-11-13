@@ -592,12 +592,15 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
             }
             if let rest = snap.active?.rest, next.workout?.id == snap.active?.id {
                 let end = Date(timeIntervalSince1970: rest.endsAt / 1000)
-                if end != self.restEndsAt { self.startRest(until: end, notify: true) }
-            } else if snap.active != nil, next.workout?.id == snap.active?.id, self.restEndsAt != nil,
-                      let started = self.restStartedAt, Date().timeIntervalSince(started) > 5 {
+                if end != self.restEndsAt { self.restAfterTick = nil; self.startRest(until: end, notify: true) }
+            } else if let a = snap.active, next.workout?.id == a.id, self.restEndsAt != nil {
                 // MyGym: the phone's rest is gone (skipped there): the watch's ends too. Not a rest
-                // this watch started a moment ago, which the phone may not have heard of yet.
-                self.skipRest(tell: false)
+                // after a set this watch ticked that the phone has not taken in yet (its snapshot
+                // shows that set not done): then the phone simply has not started its rest.
+                let heard = self.restAfterTick.map { t in
+                    a.entries.indices.contains(t.0) && a.entries[t.0].sets.indices.contains(t.1) && a.entries[t.0].sets[t.1].done
+                } ?? true
+                if heard { self.skipRest(tell: false) }
             }
             self.health.syncSetting(next.settings.health)
             self.removeDeletedFromHealth(snap.healthGone)
@@ -712,6 +715,7 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
         var rested = false
         if rest && restFor > 0 && to < (workout?.entries.count ?? 0) {
             startRest(until: now.addingTimeInterval(restFor), notify: true)
+            restAfterTick = (ei, si)
             restAfter = (e.id, ei, si, w.id ?? "", now)
             rested = true
         }
@@ -1107,8 +1111,13 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
         Haptics.discarded()
     }
 
+    /// MyGym: the set whose Done here started the running rest (entry, set); nil for a rest the
+    /// phone started.
+    private var restAfterTick: (Int, Int)?
+
     /// `tell`: the phone's rest follows (MyGym); not when the phone is the one that ended it.
     func skipRest(tell: Bool = true) {
+        restAfterTick = nil
         if tell, restEndsAt != nil { sendRest(endsAt: nil) }
         ackRestOver()
         closeRest(at: Date())
