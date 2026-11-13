@@ -842,3 +842,4 @@ under "Bodyweight": "Per side" (zh-TW 單側). The user did not find it yet.
   lateral raise (Limbs A, Torso B, Limbs B), 1350 lever seated row (Torso A, Torso B), 1454 lever
   seated shoulder press (Limbs B). Reps doubled to totals (openGym's per-side target is both sides
   together): e.g. 3 x 8-12 per arm -> 16-24.
+  The user confirmed the phone shows the three exercises as Per side (2026-11-14).
