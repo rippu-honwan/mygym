@@ -40,6 +40,7 @@ import { garminSnapshot } from './garmin-snapshot.js'
 import { plannedType } from './health-connect.js'
 import { exView, exConverted, exUnitOf, viewEntry, viewRow, shownWeight, storedWeight } from './ex-unit.js'
 import { streakInfo } from './streak.js'
+import { syncLog, snapLine } from './sync-log.js'
 
 export const SNAPSHOT_VERSION = 1
 const APPLIED_KEY = 'gym_watch_applied'
@@ -387,6 +388,7 @@ function applyEach (events, getState) {
     const S = getState()?.S
     const A = S?.active
     const ours = A && Array.isArray(A.entries) && (!ev.wid || ev.wid === A.id)
+    syncLog(`ev <- ${ev.type} ${ours ? 'ours' : 'not ours'} w=${ev.wid || '-'} e${ev.entryIdx ?? '-'} s${ev.setIdx ?? '-'}${ev.on != null ? ' on=' + ev.on : ''}${ev.r != null ? ' r=' + ev.r : ''}${ev.endsAt ? ' endsAt' : ''} handlers=${handlers ? 'yes' : 'no'}`)
     // A workout finished on the phone while the watch was away: its later ticks still count.
     const saved = !ours && ev.wid && Array.isArray(S?.workouts) ? S.workouts.find(w => w && w.id === ev.wid) : null
     if (ev.type === 'start') {
@@ -411,6 +413,7 @@ function applyEach (events, getState) {
       }
       const idx = entryIndexOf(A, ev)
       const set = idx >= 0 ? A.entries[idx].sets?.[ev.setIdx] : null
+      syncLog(`  setDone -> entry ${idx}, set ${set ? (set.done ? 'already done' : 'ticked') : 'not found'}`)
       if (set) handlers.setDone(idx, ev.setIdx, { w: num(ev.w), r: num(ev.r), at: num(ev.at), hr: sanitizeHr(ev.hr), ...extraOf(ev) })
     } else if (ev.type === 'weighIn') {
       // The weigh-in the watch asks for before a workout it starts: a body weight entry on its
@@ -763,6 +766,7 @@ async function runLink (p, { useStore, useUI }, { health = true, clips: withClip
       if (sent !== lastSent) {
         const r = await p.WatchBridge.sendSnapshot(g ? { json, garmin: g } : { json })
         if (r && r.sent) lastSent = sent
+        syncLog(snapLine(snap) + (r && r.sent ? '' : ' (not sent)'))
       }
       // The workout's animations, once per workout and exercise (the native side remembers).
       const clips = prefs.enabled && withClips ? clipsFor(S) : []

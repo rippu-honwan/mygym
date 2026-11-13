@@ -508,6 +508,13 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
             return
         }
         DispatchQueue.main.async {
+            if let a = snap.active {
+                let done = a.entries.enumerated().map { "\($0.offset):\($0.element.sets.filter { $0.done }.count)/\($0.element.sets.count)" }.joined(separator: " ")
+                let start = a.startSet.map { " start=e\($0.entryIdx)s\($0.setIdx)" } ?? ""
+                self.syncLog("snap <- w=\(a.id ?? "-") cur=\(a.cur) [\(done)] rest=\(a.rest == nil ? "off" : "on")\(start) | here: e\(self.entryIndex) rec=\(self.recordingSince == nil ? "no" : "yes") rest=\(self.restEndsAt == nil ? "off" : "on")")
+            } else {
+                self.syncLog("snap <- no workout")
+            }
             if !self.heardFromPhone {
                 self.heardFromPhone = true
                 if !self.isDemo { UserDefaults.standard.set(true, forKey: SessionStore.heardKey) }
@@ -1202,7 +1209,36 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
         completionHandler([.banner, .sound])
     }
 
+    /// MyGym debugging: what this watch heard from the phone and sent to it, sent to the Mac as one
+    /// file per workout (`<start>_watchlog_s0.csv`) a few seconds after the last line.
+    private var syncLines: [String] = []
+    private var syncLogItem: DispatchWorkItem?
+    private func syncLog(_ line: String) {
+        let f = DateFormatter()
+        f.dateFormat = "HH:mm:ss.SSS"
+        syncLines = Array((syncLines + ["\(f.string(from: Date())) \(line)"]).suffix(800))
+        syncLogItem?.cancel()
+        let item = DispatchWorkItem { [weak self] in self?.sendSyncLog() }
+        syncLogItem = item
+        DispatchQueue.main.asyncAfter(deadline: .now() + 8, execute: item)
+    }
+    private func sendSyncLog() {
+        guard !isDemo, !syncLines.isEmpty else { return }
+        let start = (workout?.start).map { $0 / 1000 } ?? workoutSeenAt?.timeIntervalSince1970 ?? Date().timeIntervalSince1970
+        let url = MotionRecorder.outbox.appendingPathComponent(MotionLog.fileName(start: start, exId: "watchlog", set: 0))
+        let text = "# {\"kind\":\"watchlog\",\"v\":1}\n" + syncLines.joined(separator: "\n") + "\n"
+        DispatchQueue.global(qos: .utility).async {
+            do { try text.write(to: url, atomically: true, encoding: .utf8) } catch { return }
+            MotionRecorder.transfer(url)
+        }
+    }
+
     private func send(event: [String: Any]) {
+        if let type = event["type"] as? String {
+            let e = event["entryIdx"].map { " e\($0)" } ?? "", s = event["setIdx"].map { " s\($0)" } ?? ""
+            let more = event["on"].map { " on=\($0)" } ?? (event["r"].map { " r=\($0)" } ?? "")
+            syncLog("ev -> \(type)\(e)\(s)\(more)")
+        }
         guard !isDemo, WCSession.isSupported(),
               let data = try? JSONSerialization.data(withJSONObject: event),
               let json = String(data: data, encoding: .utf8) else { return }

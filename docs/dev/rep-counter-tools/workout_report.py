@@ -449,6 +449,8 @@ def main():
         motions = {}
         hr_files = {}
         for f in glob.glob(os.path.join(DATA, "motion", uid, "*.csv")):
+            if "_synclog_" in f or "_watchlog_" in f:
+                continue  # the sync logs (lib/sync-log.js, the watch's), read by hand
             try:
                 meta, a = load_csv(f)
             except (OSError, ValueError):

@@ -812,3 +812,20 @@ Tests: `watch-start.test.js`, frontend 7845, WatchCore 85. NOT yet tried on the 
   rule added). The user's one-arm exercises: 0192 cable one arm lateral raise, 1350 lever seated
   row, 1454 lever seated shoulder press; none set to Per side yet. Per side means the reps
   target is the TOTAL of both sides (10 = 5 per side).
+
+### Phone Start bar out of step with the watch (2026-11-14 night)
+
+The user: the phone's Skip disappeared; the watch was resting while the phone still showed the
+set as being done ("recording"); a set done on the watch was not done on the phone. Checked: the
+iPhone's event queue (`Library/Application Support/watch-events.json`) was empty, so the events
+were taken in (applied or dropped as not ours); a unit replay of skip + recording on the real
+rest store works. Cause not found from the files left after the test (the workouts were discarded).
+Done: (1) the Start bar hides while ANY rest (also its Ready), hold or count-in shows, so the rest
+bar's Skip is never under it; (2) sync logs to find the cause: the phone logs every snapshot it
+sends (`snap -> w cur [entry:done/sets] rest start`), every watch event with ours / handlers and
+what a setDone did, and each Start press (`lib/sync-log.js`, last 800 lines, uploaded as
+`<day>-000000_synclog_s0.csv`); the watch logs every snapshot it gets with its own state and every
+event it sends (`<start>_watchlog_s0.csv` per workout). Both land in `data/motion/<uid>/`; the
+report skips them.
+Per side switch: in the routine editor, tap the exercise -> Exercise settings sheet, near the end
+under "Bodyweight": "Per side" (zh-TW 單側). The user did not find it yet.
