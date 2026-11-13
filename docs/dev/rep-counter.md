@@ -790,3 +790,19 @@ phone snapshot without a rest left the watch's running. Fixed: event `rest {wid,
 from the watch (`sendRest`; the phone's `restFromWatch` skips or `addRest`s), and the watch
 ends its rest when the phone's is gone, except a rest it started in the last 5 s. Tests:
 `watch-rest.test.js`, frontend 7843, WatchCore 85. Installed.
+
+### One-arm sets and Start set from the phone (2026-11-14, installed)
+
+The early auto-ends of 2026-11-13 were one-arm sets: the watch arm rested. Fixes:
+- A per-side set (the app's "Per side" exercise setting, L/R rows) of the arm WITHOUT the watch
+  (`WKInterfaceDevice.wristLocation`) is not counted: no Start set, Done and the reps by hand
+  (`SessionStore.countsSet`). The user has to set one-arm exercises to Per side in the routine.
+- Auto-end only once the counter has half the goal (a resting watch arm counts little).
+- Phone: "Start set N on the watch" under the exercise up next (iOS, watch checked in, reps
+  mode, not legs). It sets `useUI.watchStart`, sent as `active.startSet {entryIdx, setIdx, at}`
+  while under 60 s old; the watch starts that set once per press (`lastPhoneStart`). The watch
+  sends `recording {entryIdx, setIdx, on}` at start and stop; the phone shows "Recording set N on
+  the watch" (`useUI.watchRec`).
+- Done on the phone for the set the watch records now saves its file (the phone's reps, log
+  "done phone"); before, that recording was dropped.
+Tests: `watch-start.test.js`, frontend 7845, WatchCore 85. NOT yet tried on the devices.

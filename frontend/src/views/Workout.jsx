@@ -5,6 +5,8 @@ import { useNavigate } from 'react-router-dom'
 import { useStore } from '../store/useStore.js'
 import { workoutControls } from '../lib/workout-controls.js'
 import { useUI } from '../store/useUI.js'
+import { MOBILE } from '../lib/mobile.js'
+import { readWatchPrefs, readWatchStatus } from '../lib/watch-settings.js'
 import { autoHoldsFor, forecastHolds, nextAutoHold } from '../lib/auto-holds.js'
 import { EXIDX, exOr, betterWeight, isAssisted } from '../lib/exercises.js'
 import { bestsFor, lastRowFor, oddValues } from '../lib/typo-check.js'
@@ -138,6 +140,31 @@ const RTL_LETTER = /[֐-ࣿיִ-﷿ﹰ-﻿]/
 // The pause between the left and the right side of one timed per-side set (owner's call): long
 // enough to turn over, far shorter than the rest the set earns once both sides are held.
 const SWITCH_SIDES_SEC = 10
+
+// MyGym: Start set on the Apple Watch from here (lib/watch-sync.js `startSet`); the watch records
+// and counts that set as if pressed on the wrist, and says when it does ("recording" event).
+// Only for the exercise up next, with a watch that has checked in, and not for legs or holds.
+function WatchStartSet({ entryIdx, entry, cfg, ex }) {
+  const cur = useStore(s => s.S.active?.cur)
+  const rec = useUI(s => s.watchRec)
+  const asked = useUI(s => s.watchStart)
+  if (!MOBILE || cur !== entryIdx || !entry || !Array.isArray(entry.sets)) return null
+  if (!readWatchPrefs().enabled || !readWatchStatus()?.at) return null
+  if (modeOf(cfg) !== 'reps' || ['upper legs', 'lower legs'].includes(ex?.bp)) return null
+  const setIdx = entry.sets.findIndex(s => !s.done)
+  if (setIdx < 0) return null
+  if (rec && rec.entryIdx === entryIdx && Date.now() - rec.at < 15 * 60e3) {
+    return <div className="row" style={{ gap: 6, marginBottom: 8 }}>
+      <span className="tag acc nocap"><Icon name="watch" />{`Recording set ${rec.setIdx + 1} on the watch`}</span>
+    </div>
+  }
+  const waiting = asked && asked.entryIdx === entryIdx && Date.now() - asked.at < 5e3
+  return <div className="row" style={{ gap: 6, marginBottom: 8 }}>
+    <Button size="xs" variant="tinted" icon="watch" onClick={() => useUI.setState({ watchStart: { entryIdx, setIdx, at: Date.now() } })}>
+      {waiting ? 'Starting on the watch…' : `Start set ${setIdx + 1} on the watch`}
+    </Button>
+  </div>
+}
 
 function ExerciseBlock({ entryIdx, compact, dense, editing, onToggle, onToggleSide, onField, onAddSet, onRemoveSet, onAddWarmup, onKeepWarmups, onAskCoach, onRemoveSetAt, onCopySetAt, onStartTimed, onPairPrev, onPairNext, onSetRowRef, onProgressionSettings, onRest, onNoProg, routineUpdate, onSwap, onSwapBackup, onMoveUp, onMoveDown, canMoveUp, canMoveDown, onRemoveExercise, busy }) {
   // The block reads the state as its exercise sees it (lib/ex-unit.js): in the exercise's own
@@ -787,6 +814,7 @@ function ExerciseBlock({ entryIdx, compact, dense, editing, onToggle, onToggleSi
       <Icon name="chartLineSlash" /><span>{t('Not counted for progression')}</span>
       {onNoProg && <button type="button" className="chip" onClick={() => onNoProg(false)}>{t('Undo')}</button>}
     </div>}
+    <WatchStartSet entryIdx={entryIdx} entry={entry} cfg={cfg} ex={ex} />
     {/* compact view keeps the plan line: it is what the rows are measured against */}
     {dense && planLine}
     {wc.pairButtons && !compact && !dense && (onPairPrev || onPairNext) && <div className="row" style={{ gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>

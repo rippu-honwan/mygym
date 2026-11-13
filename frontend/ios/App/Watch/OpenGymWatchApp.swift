@@ -746,7 +746,7 @@ struct ExercisePage: View {
             if entry.isTimed {
                 RoundButton(systemImage: "play.fill", label: Text("Start hold"), size: doneSize,
                             caption: !typeSize.isAccessibilitySize) { store.startHold() }
-            } else if current && store.recordsMotion(entry) && store.recordingSince == nil {
+            } else if current && store.countsSet(entry, store.setIndex(in: index)) && store.recordingSince == nil {
                 // Rep counter: the sensor records only from Start set to Done (MotionRecorder).
                 RoundButton(systemImage: "play.fill", label: Text("Start set"), size: doneSize,
                             caption: !typeSize.isAccessibilitySize, doubleTap: current) { store.startSet() }

@@ -184,7 +184,7 @@ export function buildReady (S, today = todayISO()) {
 }
 
 /** What the watch needs to run the session: plain data, no media (licence: text only). */
-export function buildSnapshot(S, { timer = null, ready = null, activeAt = null } = {}) {
+export function buildSnapshot(S, { timer = null, ready = null, activeAt = null, startSet = null } = {}) {
   const A = S && S.active
   const unit = S && S.unit === 'lb' ? 'lb' : 'kg'
   const restSec = num(S && S.restSec) || 0
@@ -204,6 +204,8 @@ export function buildSnapshot(S, { timer = null, ready = null, activeAt = null }
       ...(num(A.start) ? { start: num(A.start) } : {}),
       unit,
       cur: Math.max(0, Math.min(A.entries.length - 1, A.cur || 0)),
+      // MyGym: Start set pressed on the phone in the last minute: the watch records that set
+      ...(startSet && Date.now() - startSet.at < 60e3 ? { startSet: { entryIdx: startSet.entryIdx, setIdx: startSet.setIdx, at: startSet.at } } : {}),
       restSec: num(S.restSec) || 0,
       // a rest running on the phone, so the watch counts down the same one
       rest: timer && !timer.paused && !timer.ready && num(timer.endsAt) ? { endsAt: timer.endsAt } : null,
@@ -340,6 +342,7 @@ function claim (ev) {
  *                                    (staleWatchFinish: the phone logged it after `at`, #904)
  *   discard { wid, at }              the workout screen's own Discard (confirmed on the watch)
  *   setHr   { wid, exId, entryIdx, setIdx, hr?, restHr? }   heart rate on a set (lib/heart-rate.js)
+ *   recording { wid, entryIdx, setIdx, on, at }  MyGym: the watch started or stopped recording a set
  *   rest    { wid, at, endsAt? }         MyGym: the watch skipped its rest (no endsAt) or moved its
  *                                    end (+15 s): the phone's rest timer follows
  *
@@ -358,6 +361,14 @@ export function restFromWatch (ev, ui = restStore?.getState?.()) {
   if (tm.paused || !num(tm.endsAt)) return
   const sec = Math.round((endsAt - tm.endsAt) / 1000)
   if (sec !== 0 && endsAt > Date.now()) ui.addRest(sec)
+}
+
+/** MyGym: the watch started (on) or stopped recording a set: the phone's Start set shows it. */
+export function recordingFromWatch (ev, store = restStore) {
+  if (!store?.setState) return
+  const entryIdx = num(ev.entryIdx), setIdx = num(ev.setIdx)
+  if (ev.on === true && entryIdx != null && setIdx != null) store.setState({ watchRec: { entryIdx, setIdx, at: num(ev.at) || Date.now() } })
+  else store.setState({ watchRec: null, watchStart: null })
 }
 
 export function applyEvents (events, getState) {
@@ -428,6 +439,8 @@ function applyEach (events, getState) {
       }
     } else if (ev.type === 'rest' && ours) {
       restFromWatch(ev)
+    } else if (ev.type === 'recording' && ours) {
+      recordingFromWatch(ev)
     } else if (ev.type === 'finish' && ours && staleWatchFinish(A, ev)) {
       // The watch took the workout for forgotten while it was being logged here (#904): it keeps
       // running, and the phone says why the watch has let go of it.
@@ -726,7 +739,7 @@ async function runLink (p, { useStore, useUI }, { health = true, clips: withClip
       const prefs = isOn(S, 'watch') ? readWatchPrefs() : { ...readWatchPrefs(), enabled: false }
       // Settings → Apple Watch: off, the watch is told there is nothing (no workout, nothing ready).
       const snap = prefs.enabled
-        ? buildSnapshot(S, { timer: useUI.getState().timer, ready: readyFor(S), activeAt: phoneActiveAt(S.active) })
+        ? buildSnapshot(S, { timer: useUI.getState().timer, ready: readyFor(S), activeAt: phoneActiveAt(S.active), startSet: useUI.getState().watchStart })
         : { v: SNAPSHOT_VERSION, unit: S.unit === 'lb' ? 'lb' : 'kg', active: null, ready: null }
       // Apple Health on the watch pauses with the Health module, as the phone's own sync does.
       const hOn = healthOn && isOn(S, 'health')
@@ -783,7 +796,9 @@ async function runLink (p, { useStore, useUI }, { health = true, clips: withClip
   })
   // The rest as the watch needs it changes when it starts, stops or is paused, not every second.
   const restOf = t => (t ? `${t.endsAt}|${!!t.paused}|${!!t.ready}` : '')
-  const offUI = useUI.subscribe((s, prev) => { if (s.timer !== prev.timer && restOf(s.timer) !== restOf(prev.timer)) schedule() })
+  const offUI = useUI.subscribe((s, prev) => {
+    if ((s.timer !== prev.timer && restOf(s.timer) !== restOf(prev.timer)) || s.watchStart !== prev.watchStart) schedule()
+  })
   const offPrefs = onWatchPrefs(() => schedule())
   // The watch speaks the app's language, not its own system's: told again when it changes (the
   // exercise names in the snapshot change with it too).

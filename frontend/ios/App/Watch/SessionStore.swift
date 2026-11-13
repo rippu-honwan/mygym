@@ -271,8 +271,26 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
     }
 
     /// Start set: the rest (if any) ends here and the sensor records until Done.
+    /// MyGym: which arm the watch is on. A per-side set of the other arm is not counted (the
+    /// watch does not move): Done right away, the reps by hand.
+    static var wristSide: String { WKInterfaceDevice.current().wristLocation == .left ? "L" : "R" }
+    func countsSet(_ e: Entry, _ si: Int?) -> Bool {
+        guard recordsMotion(e) else { return false }
+        guard let si = si, e.sets.indices.contains(si), let side = e.sets[si].sideUp else { return true }
+        return side == SessionStore.wristSide
+    }
+    /// The set being recorded (entry, set), for a Done that comes from the phone.
+    private var recordingSet: (Int, Int)?
+    /// The last phone Start set acted on (ms), so one press starts one set.
+    private var lastPhoneStart = 0.0
+
     func startSet() {
-        guard recordingSince == nil, let e = entry, setIndex != nil, recordsMotion(e) else { return }
+        guard recordingSince == nil, let e = entry, let si = setIndex, countsSet(e, si) else { return }
+        recordingSet = (entryIndex, si)
+        if let wid = workout?.id {
+            send(event: ["id": UUID().uuidString, "type": "recording", "wid": wid, "entryIdx": entryIndex,
+                         "setIdx": si, "on": true, "at": Date().timeIntervalSince1970 * 1000])
+        }
         restOverSince = nil
         if restEndsAt != nil { skipRest() }
         ackRestOver()
@@ -305,7 +323,10 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
     // ponytail: 2 s + 2 s, the user found 4 s + 3 s slow (2026-11-13); a pause at lockout longer
     // than 2 s starts the ring, which the next rep stops.
     private func checkAutoEnd() {
-        guard let since = recordingSince, autoReps >= 1, Date().timeIntervalSince(since) >= 3 else { return }
+        // Half the goal counted first: a set whose watch arm rests (one arm, a machine that holds the
+        // wrist) counts little and must not end by itself.
+        let need = max(1, Int(((repGoal ?? 2) / 2).rounded(.up)))
+        guard let since = recordingSince, autoReps >= need, Date().timeIntervalSince(since) >= 3 else { return }
         if let at = autoEndAt {
             if Date() >= at {
                 autoEndAt = nil
@@ -384,6 +405,11 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
     /// A recording that ends without Done (skipped, another set picked, the workout over): no file.
     private func stopRecording() {
         guard recordingSince != nil else { return }
+        if let wid = workout?.id, let rs = recordingSet {
+            send(event: ["id": UUID().uuidString, "type": "recording", "wid": wid, "entryIdx": rs.0,
+                         "setIdx": rs.1, "on": false, "at": Date().timeIntervalSince1970 * 1000])
+        }
+        recordingSet = nil
         autoEndTimer?.invalidate()
         autoEndTimer = nil
         autoEndAt = nil
@@ -527,9 +553,36 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
             for tick in ticks {
                 self.phoneTicked(tick, wid: next.workout?.id ?? "", resting: snap.active?.rest != nil)
             }
-            // A recording whose set was ticked on the phone, or whose workout ended or changed there:
-            // no file (the rep counter only learns from sets started and ended on the wrist).
+            // MyGym: the set being recorded was ticked on the phone: its file, with the phone's reps.
+            if let rs = self.recordingSet, let since = self.recordingSince, let w = next.workout,
+               let tick = ticks.first(where: { $0.entryIdx == rs.0 && $0.setIdx == rs.1 }),
+               w.entries.indices.contains(rs.0), w.entries[rs.0].sets.indices.contains(rs.1) {
+                let row = w.entries[rs.0].sets[rs.1]
+                self.note("done phone")
+                var meta: [String: Any] = ["auto": self.autoReps]
+                if let r = row.r { meta["reps"] = r }
+                if let wt = row.w { meta["w"] = wt }
+                if let wid = w.id { meta["wid"] = wid }
+                if let goal = self.repGoal { meta["goal"] = goal }
+                if let v = SetSpeed.summary(self.health.motion.status().sizes) { meta["vel"] = v }
+                meta["helpers"] = ["fatigue": self.state.settings.fatigue ?? 0, "autoEnd": self.state.settings.autoEnd ?? false, "log": self.setLog]
+                self.health.motion.send(entry: w.entries[rs.0], set: rs.1, from: since,
+                                        to: Date(timeIntervalSince1970: tick.at / 1000), meta: meta)
+            }
+            // A recording whose set was ticked on the phone, or whose workout ended or changed there.
             if !ticks.isEmpty || next.workout?.id != before.workout?.id { self.stopRecording() }
+            // MyGym: Start set pressed on the phone (once, while fresh): the same as here.
+            if let req = snap.active?.startSet, next.workout?.id == snap.active?.id, req.at > self.lastPhoneStart {
+                self.lastPhoneStart = req.at
+                if Date().timeIntervalSince1970 * 1000 - req.at < 60_000, self.recordingSince == nil,
+                   let w = next.workout, w.entries.indices.contains(req.entryIdx) {
+                    if self.entryIndex != req.entryIdx { self.open(entry: req.entryIdx) }
+                    if self.setIndex != req.setIdx, w.entries[req.entryIdx].sets.indices.contains(req.setIdx) {
+                        self.pick(set: req.setIdx, in: req.entryIdx)
+                    }
+                    self.startSet()
+                }
+            }
             if let rest = snap.active?.rest, next.workout?.id == snap.active?.id {
                 let end = Date(timeIntervalSince1970: rest.endsAt / 1000)
                 if end != self.restEndsAt { self.startRest(until: end, notify: true) }

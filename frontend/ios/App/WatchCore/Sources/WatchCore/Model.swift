@@ -42,6 +42,8 @@ struct ActiveWorkout: Codable, Equatable {
     var cur: Int
     var restSec: Double
     var rest: RestInfo?
+    /// MyGym: the phone's Start set, while fresh.
+    var startSet: StartSetInfo?
     var entries: [Entry]
     /// When it started (ms since 1970), for the summary's duration.
     var start: Double?
@@ -54,6 +56,13 @@ struct ActiveWorkout: Codable, Equatable {
 
 struct RestInfo: Codable, Equatable {
     var endsAt: Double
+}
+
+/// MyGym: Start set pressed on the phone (ms since 1970): the watch starts recording that set.
+struct StartSetInfo: Codable, Equatable {
+    var entryIdx: Int
+    var setIdx: Int
+    var at: Double
 }
 
 struct Entry: Codable, Equatable {
