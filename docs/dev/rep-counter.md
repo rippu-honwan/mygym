@@ -806,3 +806,9 @@ The early auto-ends of 2026-11-13 were one-arm sets: the watch arm rested. Fixes
 - Done on the phone for the set the watch records now saves its file (the phone's reps, log
   "done phone"); before, that recording was dropped.
 Tests: `watch-start.test.js`, frontend 7845, WatchCore 85. NOT yet tried on the devices.
+- 2026-11-14: the phone's Start set moved from a small chip under the exercise to a full-width
+  bar fixed at the bottom of the workout screen (`components/WatchStartBar.jsx`, shown from
+  `App.jsx` in a workout; hidden during a rest, where the rest bar sits; Reduce Transparency
+  rule added). The user's one-arm exercises: 0192 cable one arm lateral raise, 1350 lever seated
+  row, 1454 lever seated shoulder press; none set to Per side yet. Per side means the reps
+  target is the TOTAL of both sides (10 = 5 per side).

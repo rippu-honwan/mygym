@@ -674,8 +674,8 @@ h4.sec{
    is missing; a browser that has it keeps the bars see-through even with Reduce Transparency on.
    Same opaque fills, on every translucent surface. */
 @media (prefers-reduced-transparency: reduce){
-  #tabbar,#timer,#toast,.conn-bar,.whdr.stick,.stats-index{-webkit-backdrop-filter:none;backdrop-filter:none}
-  #tabbar{background:var(--bg-el)}
+  #tabbar,#timer,#toast,.conn-bar,.whdr.stick,.stats-index,.watch-start-bar{-webkit-backdrop-filter:none;backdrop-filter:none}
+  #tabbar,.watch-start-bar{background:var(--bg-el)}
   :root[data-theme="light"] #tabbar{background:#f9f9fb}
   #timer{background:var(--surface-raised)}
   #toast{background:var(--surface-2)}
@@ -3272,3 +3272,14 @@ button.wl-summary{width:100%;padding:0 0 10px;text-align:start;border-radius:var
   .kpis .tile{padding:10px 11px}
   .kpis .tile .v{font-size:var(--fs-title3)}
 }
+
+/* MyGym: the Start set bar for the Apple Watch (components/WatchStartBar.jsx), at the bottom of
+   the workout screen where the thumb is; the page keeps room for it. */
+.watch-start-bar{position:fixed;inset-inline-start:0;inset-inline-end:0;bottom:0;z-index:49;
+  padding:10px 16px calc(10px + var(--sab));background:var(--bg-el);
+  background:color-mix(in srgb,var(--bg-el) 94%,transparent);border-top:var(--hair) solid var(--sep-op);
+  -webkit-backdrop-filter:saturate(180%) blur(10px);backdrop-filter:saturate(180%) blur(10px)}
+.watch-start-btn{width:100%;min-height:52px;font-size:17px;justify-content:center}
+.watch-start-rec{display:flex;align-items:center;justify-content:center;gap:8px;min-height:52px;
+  font-weight:600;color:var(--red)}
+body.watch-start #app{padding-bottom:calc(96px + var(--sab))}
