@@ -512,7 +512,7 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
                 }
                 self.dropClips()
                 self.stopHold()
-                self.skipRest()
+                self.skipRest(tell: false)
             } else if next.workout != nil && next.workout?.id != before.workout?.id {
                 // A workout this watch picks up (the app opened mid-workout, or the phone started one).
                 self.setStartedAt = Date()
@@ -533,6 +533,11 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
             if let rest = snap.active?.rest, next.workout?.id == snap.active?.id {
                 let end = Date(timeIntervalSince1970: rest.endsAt / 1000)
                 if end != self.restEndsAt { self.startRest(until: end, notify: true) }
+            } else if snap.active != nil, next.workout?.id == snap.active?.id, self.restEndsAt != nil,
+                      let started = self.restStartedAt, Date().timeIntervalSince(started) > 5 {
+                // MyGym: the phone's rest is gone (skipped there): the watch's ends too. Not a rest
+                // this watch started a moment ago, which the phone may not have heard of yet.
+                self.skipRest(tell: false)
             }
             self.health.syncSetting(next.settings.health)
             self.removeDeletedFromHealth(snap.healthGone)
@@ -1042,7 +1047,9 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
         Haptics.discarded()
     }
 
-    func skipRest() {
+    /// `tell`: the phone's rest follows (MyGym); not when the phone is the one that ended it.
+    func skipRest(tell: Bool = true) {
+        if tell, restEndsAt != nil { sendRest(endsAt: nil) }
         ackRestOver()
         closeRest(at: Date())
         restTimer?.invalidate()
@@ -1051,12 +1058,21 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
         UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [SessionStore.restNotificationId])
     }
 
+    /// MyGym: the watch skipped its rest (nil) or moved its end: the phone's timer follows.
+    private func sendRest(endsAt: Date?) {
+        guard !isDemo, let wid = workout?.id else { return }
+        var ev: [String: Any] = ["id": UUID().uuidString, "type": "rest", "wid": wid, "at": Date().timeIntervalSince1970 * 1000]
+        if let e = endsAt { ev["endsAt"] = e.timeIntervalSince1970 * 1000 }
+        send(event: ev)
+    }
+
     func addRest(_ seconds: TimeInterval) {
         guard let end = restEndsAt else { return }
         ackRestOver()
         let start = restStartedAt
         startRest(until: end.addingTimeInterval(seconds), notify: true)
         restStartedAt = start
+        sendRest(endsAt: end.addingTimeInterval(seconds))
     }
 
     /// The rest as a timer here (with the app in front: the haptic pattern) and as a notification

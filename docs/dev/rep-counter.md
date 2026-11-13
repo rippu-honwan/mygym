@@ -772,3 +772,21 @@ Causes and fixes (installed):
   over 3 s, worst difference first, watch count vs reps at Done vs reps logged on the server
   (the iPhone may change them later), and a timeline: velocity, tilt, the watch's reps by
   source, edits, the end, and the Mac replay's reps of today's code.
+
+## Gym 2026-11-13 (Torso B, 17:49-19:00) and skip-rest sync
+
+All data arrived: 23 set files with the debug log, the workout's heart rate (841 readings) with
+`daily` (5 days resting HR, 7 days HRV: readiness needs 7 days before the day, so none yet).
+Counter against the reps at Done (the user corrected with the crown, the log shows each edit):
+speed alone mean abs 1.87 (bias +0.3), tilt alone 1.78 (+1.35), the watch's max 2.09 (+1.91,
+30 % exact, 39 % within one). Taking the larger adds both overcounts: v3 must fuse, not max.
+Assisted pull-up (0017): speed sees 1-2 of 4-7 (no swing), tilt is the useful one.
+Fatigue (30 %) fired in 14 of 22 sets, often mid-set: too eager. Auto-end rang 12 times; 3
+"sets" ended at 2-5 reps and were done again as the next set (1350 s1, 1857 s3, 0192 s2):
+probably early ends during slow reps the counters missed; acceleration, rotation and tilt just
+before the ring do not separate early from real ends. Not changed yet; asked the user.
+Skip rest did not sync (the user's report): the watch's Skip and +15 s sent nothing, and a
+phone snapshot without a rest left the watch's running. Fixed: event `rest {wid, at, endsAt?}`
+from the watch (`sendRest`; the phone's `restFromWatch` skips or `addRest`s), and the watch
+ends its rest when the phone's is gone, except a rest it started in the last 5 s. Tests:
+`watch-rest.test.js`, frontend 7843, WatchCore 85. Installed.

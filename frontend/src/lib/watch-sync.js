@@ -340,12 +340,26 @@ function claim (ev) {
  *                                    (staleWatchFinish: the phone logged it after `at`, #904)
  *   discard { wid, at }              the workout screen's own Discard (confirmed on the watch)
  *   setHr   { wid, exId, entryIdx, setIdx, hr?, restHr? }   heart rate on a set (lib/heart-rate.js)
+ *   rest    { wid, at, endsAt? }         MyGym: the watch skipped its rest (no endsAt) or moved its
+ *                                    end (+15 s): the phone's rest timer follows
  *
  * A tick for a workout already saved (finished on the phone while the watch was away) is written
  * into that saved workout, stamped so the next sync keeps it. A tick while the workout screen is
  * not open opens it (appHandlers.openWorkout), and the queue drains once it is there. Of two
  * changes of the same set, the later one (`at`) wins.
  */
+// The phone's rest timer store (useUI), set by the link; the watch's rest events move it (MyGym).
+let restStore = null
+export function restFromWatch (ev, ui = restStore?.getState?.()) {
+  const tm = ui && ui.timer
+  if (!tm || tm.ready) return
+  const endsAt = num(ev.endsAt)
+  if (endsAt == null) { ui.skipRest(num(ev.at) || Date.now()); return }
+  if (tm.paused || !num(tm.endsAt)) return
+  const sec = Math.round((endsAt - tm.endsAt) / 1000)
+  if (sec !== 0 && endsAt > Date.now()) ui.addRest(sec)
+}
+
 export function applyEvents (events, getState) {
   if (!Array.isArray(events)) return []
   // What the watch's events change in the workout is the watch's activity, not the phone's.
@@ -412,6 +426,8 @@ function applyEach (events, getState) {
         if (!appHandlers) break
         appHandlers.patchSet({ wid: ev.wid, exId: ev.exId, entryIdx: ev.entryIdx, setIdx: ev.setIdx }, fields)
       }
+    } else if (ev.type === 'rest' && ours) {
+      restFromWatch(ev)
     } else if (ev.type === 'finish' && ours && staleWatchFinish(A, ev)) {
       // The watch took the workout for forgotten while it was being logged here (#904): it keeps
       // running, and the phone says why the watch has let go of it.
@@ -665,6 +681,7 @@ export async function startLinkSync (plugin, { useStore, useUI }, opts = {}) {
 
 async function runLink (p, { useStore, useUI }, { health = true, clips: withClips = true, garmin: withGarmin = false } = {}) {
   getStateRef = () => useStore.getState()
+  restStore = useUI
   let lastSent = null, lastClips = null, tm = null
   // The ready sessions only change with the plan, the log or the day: built again only then.
   let readyKey = null, ready = null
