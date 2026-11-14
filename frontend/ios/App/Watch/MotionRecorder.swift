@@ -30,15 +30,14 @@ final class MotionRecorder {
     private var tilt = TiltCounter()
     /// How long the wrist has been still (auto-end of a set); only touched on `queue`.
     private var stillness = Stillness()
-    /// MyGym: lets a rep through only once (RepGate), and every rep let through as [start, end,
-    /// speed (the speed counter's swing size, nil for a rep only the tilt saw), source], seconds
-    /// since 1970; only touched on `queue`.
-    private var gate = RepGate()
-    private var repLog: [(Double, Double, Double?, String)] = []
+    /// MyGym rep counter v3 (WatchCore RepFusion): which of the two counters' reps count; only
+    /// touched on `queue`.
+    private var fusion = RepFusion()
     private var lastT = 0.0
-    /// A rep was counted; called on the main queue with when (seconds since 1970) and which counter
-    /// saw it first: "speed", "tilt" or "both" (the set file's log, for debugging the counter).
-    var onRep: ((Double, String) -> Void)?
+    /// The count changed by `delta` (v3 can take a rep back: a first move that was setup, or the
+    /// switch to the tilt counter); called on the main queue with the sample's time (seconds since
+    /// 1970) and the counter that counts ("speed" or "tilt").
+    var onCount: ((Int, Double, String) -> Void)?
 
     static var outbox: URL {
         let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
@@ -56,8 +55,7 @@ final class MotionRecorder {
             self?.counter = RepCounter()
             self?.tilt = TiltCounter()
             self?.stillness = Stillness()
-            self?.gate = RepGate()
-            self?.repLog = []
+            self?.fusion = RepFusion()
         }
         MotionRecorder.resendLeftovers()
         manager.deviceMotionUpdateInterval = 1 / MotionLog.hz
@@ -72,22 +70,17 @@ final class MotionRecorder {
             self.samples.append(s)
             self.stillness.push(t: s.t, ax: s.ax, ay: s.ay, az: s.az)
             self.lastT = s.t
-            // The larger of the two counts (docs/dev/rep-counter.md): speed misses slow reps,
-            // tilt misses reps that hardly turn the wrist. Two at once when one counter jumps.
-            // ponytail: max adds up both counters' overcounts; a fused signal is the next step.
-            let before = max(self.counter.reps, self.tilt.reps)
+            // Rep counter v3 (docs/dev/rep-counter.md): both counters run, RepFusion decides which
+            // reps count (speed first, tilt for slow moves, one rep once, the ends of a set).
             let (v0, t0) = (self.counter.reps, self.tilt.reps)
             self.counter.push(t: s.t, ax: s.ax, ay: s.ay, az: s.az)
             _ = self.tilt.push(t: s.t, gx: s.gx, gy: s.gy, gz: s.gz)
-            let source = self.counter.reps > v0 && self.tilt.reps > t0 ? "both" : self.counter.reps > v0 ? "speed" : "tilt"
-            for _ in before..<max(self.counter.reps, self.tilt.reps) {
-                let t = s.t
-                guard self.gate.admit(t) else { continue }
-                // the speed counter's own rep when it counted this one: its start and speed
-                let speed = self.counter.reps > v0 && !self.counter.repSizes.isEmpty
-                let start = speed ? (self.counter.repStarts.last ?? t) : (self.repLog.last?.1 ?? t)
-                self.repLog.append((start, t, speed ? self.counter.repSizes.last : nil, source))
-                DispatchQueue.main.async { self.onRep?(t, source) }
+            var delta = 0
+            for _ in v0..<self.counter.reps { delta += self.fusion.event(t: s.t, from: "speed") }
+            for _ in t0..<self.tilt.reps { delta += self.fusion.event(t: s.t, from: "tilt") }
+            if delta != 0 {
+                let (t, source) = (s.t, self.fusion.source)
+                DispatchQueue.main.async { self.onCount?(delta, t, source) }
             }
             if self.samples.count > cap { MotionLog.trim(&self.samples, now: s.t) }
         }
@@ -100,10 +93,23 @@ final class MotionRecorder {
 
     /// The set so far: each counted rep's speed and time (the speed counter's), and how many
     /// seconds the wrist has been still.
-    /// Every rep let through in this set, [start, end, speed or nil, source] (seconds since 1970).
+    /// Every rep counted in this set, [start, end, speed or nil, source] (seconds since 1970): the
+    /// speed counter's start and speed for a rep it counted, else the end of the rep before.
     func reps() -> [(Double, Double, Double?, String)] {
         var out: [(Double, Double, Double?, String)] = []
-        let op = BlockOperation { [weak self] in out = self?.repLog ?? [] }
+        let op = BlockOperation { [weak self] in
+            guard let self = self else { return }
+            let c = self.counter
+            var prev: Double?
+            for t in self.fusion.times {
+                if let i = c.repTimes.firstIndex(where: { abs($0 - t) < 0.001 }) {
+                    out.append((c.repStarts.indices.contains(i) ? c.repStarts[i] : (prev ?? t), t, c.repSizes[i], "speed"))
+                } else {
+                    out.append((prev ?? t, t, nil, "tilt"))
+                }
+                prev = t
+            }
+        }
         queue.addOperations([op], waitUntilFinished: true)
         return out
     }

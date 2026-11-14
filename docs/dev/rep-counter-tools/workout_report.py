@@ -53,15 +53,15 @@ def load_csv(path):
 
 
 def motion_of(a):
-    """What one set's motion file says: the count (the watch's rule: the larger of the speed and
-    the tilt counter), each rep's speed, the tempo and the velocity loss."""
+    """What one set's motion file says: the count (the watch's rule, counter v3: counter3.py),
+    each rep's speed, the tempo and the velocity loss."""
     if a is None or len(a) < 50:
         return None
     c = RepCounter2()
     for i in range(len(a)):
         c.push(a[i, 0], a[i, 1:4], a[i, 7:10])
-    tilt = tilt_run(a[:, 0], a[:, 7:10]).reps
-    out = {"count": max(c.reps, tilt), "speeds": list(c.rep_sizes), "events": list(c.events)}
+    from counter3 import run as v3
+    out = {"count": v3(a[:, 0], a[:, 1:4], a[:, 7:10]).count, "speeds": list(c.rep_sizes), "events": list(c.events)}
     if len(c.events) >= 2:
         out["tempo"] = float(np.median(np.diff(c.events)))
     sp = c.rep_sizes

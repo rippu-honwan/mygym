@@ -899,3 +899,23 @@ Tests: WatchCore 86 (RepGate), frontend (rawFrom), report helpers checked by han
   (rep 4 at the earliest); the long-gap ("grind") rule is gone. Replay on today's 16 sets with
   per-rep speeds: old rule fired in 8 (2 of them 6-7 reps before the end), new rule in 5, at 2, 0,
   -1, -1 and 5 reps left. At 40 % it would fire in 1.
+
+## Rep counter v3 (2026-11-14, installed)
+
+Tuning set: `rep-counter-tools/dataset.py`, every set file with the watch log (44 sets; reps left
+at Done are the truth, 29 corrected by hand). Tried offline: period from autocorrelation and
+peak counting on rotation angle, tilt, or a fusion of both: no better than v2 (mean error
+2.2-3.6). Per-exercise choice of counter (leave one out): 1.83. What worked: speed first, tilt
+only when speed sees little, and dropping reps that stand apart at the ends of a set.
+v3 = `WatchCore/RepFusion.swift`, twin `counter3.py` (counts equal on two real fixture sets):
+speed counter's reps; the tilt counter's instead once it has 5 and speed under 0.6 x as many;
+RepGate (0.8 s, and 0.35 x median gap from 3 gaps on); from 4 reps a rep over 1.8 x the median gap
+after the last waits for the next to confirm it; at 5 reps a first rep that stood 1.8 x apart is
+taken back (the watch's count goes down by one, `unrep` in the log, no tap; not if the reps were
+edited by hand). Replay against v2 as the watch ran it:
+  all 44:      within one 50 % -> 61 %, exact 30 % -> 32 %, mean error 2.18 -> 1.73
+  29 by hand:  within one 31 % -> 52 %, exact  0 % -> 28 %, mean error 2.76 -> 1.79
+Still far from 80 % exact. Ceiling seen offline (trimming after the set ends): 66 % within one on
+the hand-checked sets. Next levers: per-exercise choice of counter (needs more sets per
+exercise), the user's RIR and checked sets as they add up. The report's "Watch" column and the
+debug page's Mac replay now use v3.

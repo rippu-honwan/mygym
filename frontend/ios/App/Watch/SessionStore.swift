@@ -196,7 +196,10 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
             }
         }
         health.onStatus = { [weak self] in self?.sendStatus() }
-        health.motion.onRep = { [weak self] t, source in self?.countRep(at: t, source: source) }
+        health.motion.onCount = { [weak self] delta, t, source in
+            guard let self = self else { return }
+            if delta > 0 { for _ in 0..<delta { self.countRep(at: t, source: source) } } else { self.uncount(-delta, at: t) }
+        }
         let center = UNUserNotificationCenter.current()
         center.delegate = self
         if !isDemo { center.requestAuthorization(options: [.alert, .sound]) { _, _ in } }
@@ -417,6 +420,19 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
                 for d in [0.4, 0.9] { DispatchQueue.main.asyncAfter(deadline: .now() + d) { WKInterfaceDevice.current().play(.notification) } }
             }
         }
+    }
+
+    /// MyGym v3 took reps back (a first move that was setup, or the switch to the tilt counter):
+    /// the count goes down without a tap; a count edited by hand meanwhile is the lifter's.
+    private func uncount(_ n: Int, at t: Double) {
+        guard let since = recordingSince, n > 0 else { return }
+        autoReps = max(0, autoReps - n)
+        if !repsChecked {
+            counting = true
+            reps = max(0, reps - Double(n))
+            counting = false
+        }
+        setLog.append([((t - since.timeIntervalSince1970) * 10).rounded() / 10, "unrep \(n)"])
     }
 
     /// A recording that ends without Done (skipped, another set picked, the workout over): no file.
