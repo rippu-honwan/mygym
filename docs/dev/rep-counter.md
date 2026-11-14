@@ -876,3 +876,21 @@ start, sleep; one rep counted twice; vel.loss cut to 0; more set files than sets
   a set's time). 11-13: 22 set files -> 21 sets (the 21st is a set file whose set was taken off on
   the phone). Files now carry `side` for per-side sets.
 Tests: WatchCore 86 (RepGate), frontend (rawFrom), report helpers checked by hand.
+
+## Gym 2026-11-14 (Limbs B, 14:57-16:06) with the raw data build
+
+- All new data arrived: 17 set files with `repsDetail`, `checked`, `startedAt`, `side` (1454 and
+  0192 Per side: only the watch arm's L sets have files); the saved workout has `vel` on 16 of 22
+  sets (the phone fix works), `startedAt` on 22, `checked` on 13. RIR on 0 sets (not used yet).
+  `daily.sleep` missing: no sleep data or no permission yet.
+- Upload bug: the files sat on the iPhone after the workout; the upload at launch ran before the
+  server link was ready and nothing retried it. Fixed: `motion-upload.js` also tries once a minute
+  while the app is open. Installed.
+- Counter with RepGate: 17 sets, 24 % exact, 65 % within one, mean abs 1.94, bias -0.29 (13 Nov:
+  39 % within one, bias +1.9). 0192 (one-arm lateral raise) and 7744 (face pull) had no speed
+  reps (tilt only).
+- Fatigue alert (30 %) fired in 12 of 17 sets: still too eager.
+- Sync logs: the phone took the watch's ticks 5 s to 6.5 min late. The iPhone was locked: iOS
+  keeps the WebView asleep, the events wait in the native queue and are applied when the app
+  comes to the front. Not a bug of ours; it means the phone's screen is out of date while
+  locked, and right once opened. No phone Start presses today; 2 watch skips sent.

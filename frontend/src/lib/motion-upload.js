@@ -43,5 +43,9 @@ export async function initMotionUpload () {
     plugin.addListener('motionFile', go)
     const { App } = await import('@capacitor/app')
     App.addListener('appStateChange', ({ isActive }) => { if (isActive) go() })
+    // MyGym: and once a minute while the app runs. The try at launch can come before the server
+    // link is ready, and back home nothing else may happen to trigger one (2026-11-14: a whole
+    // workout's files stayed on the phone with the app open).
+    setInterval(() => { if (typeof document === 'undefined' || document.visibilityState !== 'hidden') go() }, 60e3)
   } catch { /* no native side here */ }
 }
