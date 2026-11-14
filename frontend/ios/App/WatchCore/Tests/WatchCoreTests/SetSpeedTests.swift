@@ -13,10 +13,11 @@ final class SetSpeedTests: XCTestCase {
     func testFatigued() {
         let t = [0.0, 2, 4, 6, 8, 10]
         XCTAssertFalse(SetSpeed.fatigued(sizes: [1, 1, 1, 0.9, 0.85, 0.8], times: t, limit: 0.3))
-        XCTAssertTrue(SetSpeed.fatigued(sizes: [1, 1, 1, 0.9, 0.8, 0.6], times: t, limit: 0.3))
-        XCTAssertFalse(SetSpeed.fatigued(sizes: [1, 1, 1, 0.9, 0.8, 0.6], times: t, limit: 0), "off")
-        XCTAssertFalse(SetSpeed.fatigued(sizes: [1, 1, 0.5], times: [0, 2, 4], limit: 0.3), "too soon")
-        XCTAssertTrue(SetSpeed.fatigued(sizes: [1, 1, 1, 1, 1, 1], times: [0, 2, 4, 6, 8, 13], limit: 0.3), "a grind")
+        XCTAssertFalse(SetSpeed.fatigued(sizes: [1, 1, 1, 0.9, 0.9, 0.6], times: t, limit: 0.3), "one slow rep is not enough")
+        XCTAssertTrue(SetSpeed.fatigued(sizes: [1, 1, 1, 0.9, 0.6, 0.6], times: t, limit: 0.3), "two in a row")
+        XCTAssertFalse(SetSpeed.fatigued(sizes: [1, 1, 1, 0.9, 0.6, 0.6], times: t, limit: 0), "off")
+        XCTAssertFalse(SetSpeed.fatigued(sizes: [1, 1, 1, 0.9, 0.6, 0.6], times: t, limit: 0.3, goal: 12), "under 60 % of a goal of 12")
+        XCTAssertFalse(SetSpeed.fatigued(sizes: [1, 1, 1, 1, 1, 1], times: [0, 2, 4, 6, 8, 13], limit: 0.3), "a long gap alone is not fatigue")
     }
 
     func testStillness() {

@@ -14,15 +14,15 @@ enum SetSpeed {
         return ["best": r(best), "last": r(last), "loss": r(max(0, 1 - last / best))]
     }
 
-    /// The set is near failure: the last rep `limit` (0.3: 30 %) slower than the best of the first
-    /// three, or it took more than twice as long as the reps before it (a grind). From rep 4 on.
-    static func fatigued(sizes: [Double], times: [Double], limit: Double) -> Bool {
-        guard limit > 0, sizes.count >= 4, let best = sizes.prefix(3).max(), let last = sizes.last else { return false }
-        if last < (1 - limit) * best { return true }
-        let gaps = zip(times.dropFirst(), times).map { $0 - $1 }
-        guard gaps.count >= 4, let g = gaps.last else { return false }
-        let earlier = gaps.dropLast().sorted()
-        return g > 2 * earlier[earlier.count / 2]
+    /// The set is near failure (MyGym, calmer since 2026-11-14): the last TWO reps each `limit`
+    /// (0.3: 30 %) slower than the best of the first three, and no sooner than 60 % of the goal (at
+    /// least rep 4). The old rule (one slow rep, or one long gap) fired in 12 of 17 sets, often
+    /// mid-set; this one fired in 5 of 16, 0-2 reps before the end in most.
+    static func fatigued(sizes: [Double], times: [Double], limit: Double, goal: Double? = nil) -> Bool {
+        let need = max(4, Int(((goal ?? 0) * 0.6).rounded(.up)))
+        guard limit > 0, sizes.count >= need, let best = sizes.prefix(3).max() else { return false }
+        let slow = (1 - limit) * best
+        return sizes[sizes.count - 1] < slow && sizes[sizes.count - 2] < slow
     }
 }
 

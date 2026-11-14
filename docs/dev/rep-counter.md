@@ -894,3 +894,8 @@ Tests: WatchCore 86 (RepGate), frontend (rawFrom), report helpers checked by han
   keeps the WebView asleep, the events wait in the native queue and are applied when the app
   comes to the front. Not a bug of ours; it means the phone's screen is out of date while
   locked, and right once opened. No phone Start presses today; 2 watch skips sent.
+- Fatigue alert toned down (the user asked, 2026-11-14): `SetSpeed.fatigued` now needs the last
+  TWO reps each `limit` slower than the best of the first three, and at least 60 % of the goal
+  (rep 4 at the earliest); the long-gap ("grind") rule is gone. Replay on today's 16 sets with
+  per-rep speeds: old rule fired in 8 (2 of them 6-7 reps before the end), new rule in 5, at 2, 0,
+  -1, -1 and 5 reps left. At 40 % it would fire in 1.

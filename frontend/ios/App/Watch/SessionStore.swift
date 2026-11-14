@@ -410,7 +410,7 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
         // Fatigue (setting): once per set, two taps apart from the rep's own.
         if let limit = state.settings.fatigue, limit > 0, !fatigueWarned {
             let st = health.motion.status()
-            if SetSpeed.fatigued(sizes: st.sizes, times: st.times, limit: limit) {
+            if SetSpeed.fatigued(sizes: st.sizes, times: st.times, limit: limit, goal: repGoal) {
                 fatigueWarned = true
                 note("fatigue")
                 // stronger than a rep's tap, and twice
