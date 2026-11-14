@@ -30,6 +30,11 @@ final class MotionRecorder {
     private var tilt = TiltCounter()
     /// How long the wrist has been still (auto-end of a set); only touched on `queue`.
     private var stillness = Stillness()
+    /// MyGym: lets a rep through only once (RepGate), and every rep let through as [start, end,
+    /// speed (the speed counter's swing size, nil for a rep only the tilt saw), source], seconds
+    /// since 1970; only touched on `queue`.
+    private var gate = RepGate()
+    private var repLog: [(Double, Double, Double?, String)] = []
     private var lastT = 0.0
     /// A rep was counted; called on the main queue with when (seconds since 1970) and which counter
     /// saw it first: "speed", "tilt" or "both" (the set file's log, for debugging the counter).
@@ -51,6 +56,8 @@ final class MotionRecorder {
             self?.counter = RepCounter()
             self?.tilt = TiltCounter()
             self?.stillness = Stillness()
+            self?.gate = RepGate()
+            self?.repLog = []
         }
         MotionRecorder.resendLeftovers()
         manager.deviceMotionUpdateInterval = 1 / MotionLog.hz
@@ -75,6 +82,11 @@ final class MotionRecorder {
             let source = self.counter.reps > v0 && self.tilt.reps > t0 ? "both" : self.counter.reps > v0 ? "speed" : "tilt"
             for _ in before..<max(self.counter.reps, self.tilt.reps) {
                 let t = s.t
+                guard self.gate.admit(t) else { continue }
+                // the speed counter's own rep when it counted this one: its start and speed
+                let speed = self.counter.reps > v0 && !self.counter.repSizes.isEmpty
+                let start = speed ? (self.counter.repStarts.last ?? t) : (self.repLog.last?.1 ?? t)
+                self.repLog.append((start, t, speed ? self.counter.repSizes.last : nil, source))
                 DispatchQueue.main.async { self.onRep?(t, source) }
             }
             if self.samples.count > cap { MotionLog.trim(&self.samples, now: s.t) }
@@ -88,6 +100,14 @@ final class MotionRecorder {
 
     /// The set so far: each counted rep's speed and time (the speed counter's), and how many
     /// seconds the wrist has been still.
+    /// Every rep let through in this set, [start, end, speed or nil, source] (seconds since 1970).
+    func reps() -> [(Double, Double, Double?, String)] {
+        var out: [(Double, Double, Double?, String)] = []
+        let op = BlockOperation { [weak self] in out = self?.repLog ?? [] }
+        queue.addOperations([op], waitUntilFinished: true)
+        return out
+    }
+
     func status() -> (sizes: [Double], times: [Double], still: Double) {
         var out: (sizes: [Double], times: [Double], still: Double) = ([], [], 0)
         let op = BlockOperation { [weak self] in
@@ -117,6 +137,8 @@ final class MotionRecorder {
         meta["exId"] = e.id
         meta["name"] = e.name
         meta["set"] = si + 1
+        // the side of a per-side set, so its two sides stay two files (MyGym)
+        if e.sets.indices.contains(si), meta["side"] == nil, let side = e.sets[si].sideUp { meta["side"] = side }
         meta["start"] = (a * 1000).rounded()
         meta["end"] = (b * 1000).rounded()
         if let bp = e.bodyPart { meta["bodyPart"] = bp }

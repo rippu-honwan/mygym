@@ -843,3 +843,36 @@ under "Bodyweight": "Per side" (zh-TW 單側). The user did not find it yet.
   seated shoulder press (Limbs B). Reps doubled to totals (openGym's per-side target is both sides
   together): e.g. 3 x 8-12 per arm -> 16-24.
   The user confirmed the phone shows the three exercises as Per side (2026-11-14).
+
+## Raw data and counter fixes asked for by the analysis (2026-11-14)
+
+Needs (from the analysis session): per-rep data, RIR per set, a "reps checked" flag, each set's
+start, sleep; one rep counted twice; vel.loss cut to 0; more set files than sets.
+- Per rep (P1): the set file's `repsDetail` = [[start, end, speed|null, source], ...] in seconds
+  from Start set, one row per rep the watch counted. Start/speed from the speed counter
+  (`RepCounter.repStarts/repSizes`); a rep only the tilt saw has speed null and starts where the
+  rep before ended (`MotionRecorder.repLog`).
+- RIR (P1): the watch offers RIR on every set (`effortKind` defaults to "rir" when the profile
+  picked no scale; RPE stays RPE). The effort button left of Done: crown 0-5 (5 = 5 or more; the
+  scale openGym already uses), then Done. The phone keeps `rir` on the set (`effortFrom`).
+- Checked (P2): `checked` in the file and on the set (event `checked`, phone `rawFrom`): the
+  reps were changed on the wrist or the set rated while counting.
+- Start (P2): `startedAt` (ms; Start set, else the end of the rest before) in the file and on
+  the set; the report's real rest uses it.
+- BUG found: the phone's watch-tick handler (`Workout.jsx` setDone) dropped every field it did
+  not name, so `vel` never reached a saved set (0 of 20 on 11-13). It now keeps vel, startedAt
+  and checked.
+- Sleep (P3): hours asleep per night (Apple Health sleep stages, "in bed" left out; a night ending
+  before 15:00 belongs to that day) in the HR file's `daily.sleep`; the watch asks once more for
+  Apple Health access (new type). Smith bar weight (P3): no code; it is the exercise's bar weight
+  setting in the app (stored in `S.barWeights`), the user enters it.
+- Double count: `RepGate` (WatchCore, twin `counter2.gated`): a rep within max(0.8 s, 0.35 x
+  median gap) of the one before is dropped. Replay on 29 checked sets: mean error 2.21 -> 1.97,
+  bias +0.97 -> +0.38 (6392 s3 had 0 s gaps). The real fix is counter v3 (other session).
+- vel.loss: the report computes loss from `repsDetail` when the file has it, shows "?" when a
+  rep of the first three has no speed (best unknown) and never cuts it to 0 (negative: faster).
+- Set files: a set done again leaves two files; the report keeps the newest per (workout,
+  exercise, set number, side) and joins files to sets by set number, not time (the phone may move
+  a set's time). 11-13: 22 set files -> 21 sets (the 21st is a set file whose set was taken off on
+  the phone). Files now carry `side` for per-side sets.
+Tests: WatchCore 86 (RepGate), frontend (rawFrom), report helpers checked by hand.

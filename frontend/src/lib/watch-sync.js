@@ -55,7 +55,16 @@ const okBw = v => { const n = num(v); return n != null && n > 0 && n < 700 }
 // One side of a per-side set, from the watch: 'L', 'R', or none (the whole set).
 const sideOf = v => (v === 'L' || v === 'R' ? v : null)
 // What a tick of a hold (`sec`) or of one side carries besides the numbers; nothing for a plain set.
-const extraOf = ev => ({ ...(num(ev.sec) != null ? { sec: num(ev.sec) } : {}), ...(sideOf(ev.side) ? { side: sideOf(ev.side) } : {}), ...effortFrom(ev), ...velFrom(ev) })
+const extraOf = ev => ({ ...(num(ev.sec) != null ? { sec: num(ev.sec) } : {}), ...(sideOf(ev.side) ? { side: sideOf(ev.side) } : {}), ...effortFrom(ev), ...velFrom(ev), ...rawFrom(ev) })
+// MyGym raw data on a set from the watch: when it began (ms, before its tick and at most an hour
+// earlier) and whether the counted reps were checked on the wrist.
+export function rawFrom (ev) {
+  const out = {}
+  const st = num(ev && ev.startedAt), at = num(ev && ev.at)
+  if (st != null && st > 0 && (at == null || (st <= at && at - st < 3600e3))) out.startedAt = st
+  if (ev && typeof ev.checked === 'boolean') out.checked = ev.checked
+  return out
+}
 // MyGym: the set's speed from the watch's rep counter, { vel: { best, last, loss } } (relative
 // speeds; loss 0-1), or nothing when it does not hold up.
 export function velFrom (ev) {

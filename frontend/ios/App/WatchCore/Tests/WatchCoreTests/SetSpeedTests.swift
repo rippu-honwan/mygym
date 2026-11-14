@@ -27,4 +27,15 @@ final class SetSpeedTests: XCTestCase {
         for _ in 0..<350 { s.push(t: t, ax: 0.01, ay: 0.01, az: 0); t += 0.02 }
         XCTAssertGreaterThan(s.stillFor(at: t), 4, "still for the last seconds")
     }
+
+    func testRepGate() {
+        var g = RepGate()
+        XCTAssertTrue(g.admit(1))
+        XCTAssertFalse(g.admit(1), "the same moment: one rep")
+        XCTAssertFalse(g.admit(1.5), "under 0.8 s")
+        XCTAssertTrue(g.admit(4))
+        XCTAssertTrue(g.admit(7))
+        XCTAssertFalse(g.admit(7.9), "under a third of the usual 3 s")
+        XCTAssertTrue(g.admit(10.2))
+    }
 }

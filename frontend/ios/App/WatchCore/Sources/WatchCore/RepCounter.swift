@@ -36,6 +36,11 @@ struct RepCounter {
     /// Each counted rep's swing size (its speed, top to bottom) and when it was counted: the set's
     /// speed summary and the fatigue alert (SetSpeed).
     private(set) var repSizes: [Double] = [], repTimes: [Double] = []
+    /// When each counted rep began: the swing before it ended there (the first: the movement's
+    /// first turn). With repTimes, each rep's start and end (MyGym raw data).
+    private(set) var repStarts: [Double] = []
+    /// When the movement first turned, for the first rep's start.
+    private var firstTurn: Double?
     private let dt: Double
     private var mean: SIMD3<Double>?
     private var v = SIMD3<Double>(), vs = SIMD3<Double>()
@@ -73,13 +78,14 @@ struct RepCounter {
         top = max(top, x); bottom = min(bottom, x)
         if x < -th, state >= 0 {
             state = -1
+            if firstTurn == nil { firstTurn = t }
         } else if x > th, state <= 0 {
             let was = state
             state = 1
             if was < 0 {
                 let period = last.map { t - $0 }
                 if period == nil || period! >= RepCounter.minPeriod {
-                    swing(size: top - bottom, period: period, t: t)
+                    swing(size: top - bottom, period: period, t: t, start: last ?? firstTurn ?? t)
                     last = t
                     top = x; bottom = 0
                 }
@@ -103,27 +109,32 @@ struct RepCounter {
         return period >= RepCounter.periodRange.lowerBound * p && period <= RepCounter.periodRange.upperBound * p
     }
 
-    private mutating func swing(size: Double, period: Double?, t: Double) {
+    private mutating func swing(size: Double, period: Double?, t: Double, start: Double) {
         guard size >= RepCounter.minSize else { return }
         if sizes.isEmpty {
             sizes = [size]; periods = []; reps += 1
-            repSizes.append(size); repTimes.append(t)
+            repSizes.append(size); repTimes.append(t); repStarts.append(start)
         } else if like(size, period, sizes: sizes, periods: periods) {
             sizes.append(size); odd = nil
             if let p = period { periods.append(p) }
             reps += 1
-            repSizes.append(size); repTimes.append(t)
+            repSizes.append(size); repTimes.append(t); repStarts.append(start)
         } else if sizes.count == 1 {
             // The lone first swing was getting into position: this one is rep 1 in its place.
             sizes = [size]; periods = []; odd = nil
-            if !repSizes.isEmpty { repSizes[repSizes.count - 1] = size; repTimes[repTimes.count - 1] = t }
+            if !repSizes.isEmpty {
+                repSizes[repSizes.count - 1] = size; repTimes[repTimes.count - 1] = t; repStarts[repStarts.count - 1] = start
+            }
         } else if let o = odd, like(size, nil, sizes: [o], periods: []) {
             // Two alike in a row, unlike the reps before: the reps changed, both count.
             sizes = [o, size]; periods = period.map { [$0] } ?? []; odd = nil
             reps += 2
-            repSizes += [o, size]; repTimes += [t, t]
+            repSizes += [o, size]; repTimes += [start, t]; repStarts += [oddStart ?? start, start]
         } else {
             odd = size
+            oddStart = start
         }
     }
+    /// When the swing that did not fit began.
+    private var oddStart: Double?
 }

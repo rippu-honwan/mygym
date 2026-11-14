@@ -70,6 +70,25 @@ final class WorkoutManager: NSObject, ObservableObject, HKWorkoutSessionDelegate
             }
             store.execute(q)
         }
+        // Sleep: the hours asleep of each night, by the day it ended (a night ending before 15:00
+        // belongs to that day). Apple Watch sleep stages count, "in bed" does not.
+        if let sleepType = HKObjectType.categoryType(forIdentifier: .sleepAnalysis) {
+            group.enter()
+            let q = HKSampleQuery(sampleType: sleepType, predicate: HKQuery.predicateForSamples(withStart: start, end: Date()),
+                                  limit: HKObjectQueryNoLimit, sortDescriptors: nil) { _, samples, _ in
+                var byDay: [String: Double] = [:]
+                let inBed = HKCategoryValueSleepAnalysis.inBed.rawValue
+                for case let s as HKCategorySample in samples ?? [] where s.value != inBed {
+                    let end = s.endDate
+                    let wake = cal.component(.hour, from: end) < 15 ? end : cal.date(byAdding: .day, value: 1, to: end)!
+                    byDay[day.string(from: wake), default: 0] += s.endDate.timeIntervalSince(s.startDate) / 3600
+                }
+                let rows: [[Any]] = byDay.keys.sorted().map { [$0, (byDay[$0]! * 10).rounded() / 10] }
+                lock.lock(); if !rows.isEmpty { out["sleep"] = rows }; lock.unlock()
+                group.leave()
+            }
+            store.execute(q)
+        }
         group.notify(queue: .main) { done(out) }
     }
 
@@ -96,6 +115,8 @@ final class WorkoutManager: NSObject, ObservableObject, HKWorkoutSessionDelegate
         for id in [HKQuantityTypeIdentifier.restingHeartRate, .heartRateVariabilitySDNN] {
             if let t = HKObjectType.quantityType(forIdentifier: id) { read.insert(t) }
         }
+        // MyGym: last night's sleep, for the long-term model.
+        if let sleep = HKObjectType.categoryType(forIdentifier: .sleepAnalysis) { read.insert(sleep) }
         // The calories the workout burned, for the summary at its end (and in Apple Health).
         if let kcal = HKObjectType.quantityType(forIdentifier: .activeEnergyBurned) { share.insert(kcal); read.insert(kcal) }
         store.requestAuthorization(toShare: share, read: read) { ok, _ in
@@ -167,8 +188,8 @@ final class WorkoutManager: NSObject, ObservableObject, HKWorkoutSessionDelegate
     func start(workoutId wid: String? = nil, type: String? = nil, opened: HKWorkoutActivityType? = nil) {
         wanted = true
         // MyGym: ask once for the two readiness types added after Apple Health was switched on.
-        if enabled && !UserDefaults.standard.bool(forKey: "askedReadiness") {
-            UserDefaults.standard.set(true, forKey: "askedReadiness")
+        if enabled && !UserDefaults.standard.bool(forKey: "askedSleep") {
+            UserDefaults.standard.set(true, forKey: "askedSleep")
             requestAuthorization { _ in }
         }
         if let wid = wid { workoutId = wid }

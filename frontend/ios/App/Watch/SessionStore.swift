@@ -84,11 +84,25 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
             guard reps != oldValue else { return }
             ackRestOver()
             // A change by hand while a set is counted: the crown or - and + (the set file's log).
-            if recordingSince != nil && !counting { note("edit \(formatReps(oldValue))>\(formatReps(reps))") }
+            if recordingSince != nil && !counting {
+                note("edit \(formatReps(oldValue))>\(formatReps(reps))")
+                repsChecked = true
+            }
         }
     }
     /// The counter is changing `reps` (not the lifter).
     private var counting = false
+    /// MyGym: the lifter looked at this set's count: changed the reps or rated the set.
+    private var repsChecked = false
+
+    /// MyGym raw data for the set file: every rep [start, end, speed or null, source] in seconds
+    /// from Start set, whether the reps were checked, and when the set began (ms since 1970).
+    private func rawMeta(since: Date) -> [String: Any] {
+        let s = since.timeIntervalSince1970
+        let r = { (v: Double) in (v * 100).rounded() / 100 }
+        let detail: [[Any]] = health.motion.reps().map { [r($0.0 - s), r($0.1 - s), $0.2.map { r($0) } ?? NSNull(), $0.3] }
+        return ["repsDetail": detail, "checked": repsChecked, "startedAt": (s * 1000).rounded()]
+    }
     private func formatReps(_ v: Double) -> String { v.rounded() == v ? String(Int(v)) : String(v) }
     /// A hold's seconds, for the set up next (the crown turns it).
     @Published var seconds: Double = 0 { didSet { if seconds != oldValue { ackRestOver() } } }
@@ -97,7 +111,9 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
     @Published private(set) var effort: Double?
     private var effortFor: String?
     /// The scale the phone's profile logs, when it logs one ("rpe" / "rir"): the set page offers it.
-    var effortKind: String? { Effort.notches(state.settings.effort) != nil ? state.settings.effort : nil }
+    // MyGym: RIR on every set unless the profile picked RPE (the rep counter's fatigue model needs
+    // "how many were left" as its label, docs/dev/rep-counter.md).
+    var effortKind: String? { Effort.notches(state.settings.effort) != nil ? state.settings.effort : "rir" }
     /// A hold running: when it ends, and when it started.
     @Published private(set) var holdEndsAt: Date?
     @Published private(set) var holdStartedAt: Date?
@@ -300,6 +316,7 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
         // The reps count up from 0 now; what was planned stays in sight as the goal.
         repGoal = reps
         autoReps = 0
+        repsChecked = false
         counting = true
         reps = 0
         counting = false
@@ -573,6 +590,7 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
                 if let goal = self.repGoal { meta["goal"] = goal }
                 if let v = SetSpeed.summary(self.health.motion.status().sizes) { meta["vel"] = v }
                 meta["helpers"] = ["fatigue": self.state.settings.fatigue ?? 0, "autoEnd": self.state.settings.autoEnd ?? false, "log": self.setLog]
+                for (k, v) in self.rawMeta(since: since) { meta[k] = v }
                 self.health.motion.send(entry: w.entries[rs.0], set: rs.1, from: since,
                                         to: Date(timeIntervalSince1970: tick.at / 1000), meta: meta)
             }
@@ -616,6 +634,7 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
 
     /// The effort for the set up next, from its editor; nil clears it.
     func rate(_ v: Double?) {
+        if recordingSince != nil, v != nil { repsChecked = true; note("rated \(v!)") }
         ackRestOver()
         effort = v
         effortFor = v == nil ? nil : setKey
@@ -678,6 +697,10 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
         // Sent first, saved second: killed in between, the phone still has the tick (and the next
         // snapshot brings it back here); the other way round the tick would be lost on the phone.
         if let v = vel { event?["vel"] = v }
+        // MyGym: when the set began (Start set, else the end of the rest before it), and whether
+        // the counted reps were checked, for the real rest and for which counts to trust.
+        event?["startedAt"] = ((recordingSince ?? setFrom).timeIntervalSince1970 * 1000).rounded()
+        if recordingSince != nil { event?["checked"] = repsChecked }
         if let event = event { send(event: event) }
         if let since = recordingSince {
             // The set's motion, from Start set to this Done, for the rep counter (MotionRecorder).
@@ -691,6 +714,7 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
             if let v = vel { meta["vel"] = v }
             // what the helpers did, and with which settings (MyGym)
             meta["helpers"] = ["fatigue": state.settings.fatigue ?? 0, "autoEnd": state.settings.autoEnd ?? false, "log": setLog]
+            for (k, v) in rawMeta(since: since) { meta[k] = v }
             // The heart rate from the last Done (the rest before this set, at most 10 min) to this
             // one, as [seconds from Start set, bpm]: to tune a rest that ends by heart rate.
             let hrFrom = max(doneBefore ?? since.addingTimeInterval(-300), since.addingTimeInterval(-600))

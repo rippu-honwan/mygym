@@ -86,6 +86,20 @@ def run(t, a, g, **kw):
     for i in range(len(t)): c.push(t[i], a[i], g[i])
     return c
 
+def gated(times, min_gap=0.8, rel_gap=0.35):
+    """WatchCore RepGate: a rep within min_gap s, or rel_gap x the median gap, of the one before is
+    the same rep counted twice. Returns the times let through."""
+    out = []
+    for t in times:
+        if out:
+            gaps = sorted(b - a for a, b in zip(out, out[1:]))
+            lim = max(min_gap, rel_gap * (gaps[len(gaps) // 2] if gaps else 0))
+            if t - out[-1] < lim:
+                continue
+        out.append(t)
+    return out
+
+
 def fused(t, a, g, **kw):
     """What the watch counts (MotionRecorder): the larger of the speed and the tilt counter.
     Speed misses slow reps (they barely accelerate), tilt misses reps that hardly turn the wrist."""

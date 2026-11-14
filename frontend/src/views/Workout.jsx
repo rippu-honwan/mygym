@@ -2148,7 +2148,7 @@ function ActiveWorkout() {
   // The time is the watch's: the phone may hear of the set much later (lib/finish-workout.js
   // sessionEnd reads the sets' times). The watch's Finish runs the phone's Finish and save.
   useEffect(() => bindWatchActions({
-    setDone: (idx, i, { w, r, sec, side, at, hr, rpe, rir }) => {
+    setDone: (idx, i, { w, r, sec, side, at, hr, rpe, rir, vel, startedAt, checked }) => {
       if (useStore.getState().S.active?.editingWorkoutId) return   // a saved workout being edited is not the session
       const now = useStore.getState().S.active?.entries?.[idx]?.sets?.[i]
       // One side of a per-side set (a unilateral exercise): that side's numbers and its own tick.
@@ -2179,6 +2179,15 @@ function ActiveWorkout() {
       })
       if (!wasDone) toggleRef.current(idx, i, oneSide || undefined)
       if (at || hr) mutEntry(idx, en => { const set = en.sets[i]; if (!(oneSide ? set?.sides?.[oneSide]?.done : set?.done)) return; if (at) set.at = at; if (hr) set.hr = hr })
+      // MyGym: the rep counter's raw data on the set (lib/watch-sync.js velFrom, rawFrom); it was
+      // dropped here before, so no set ever kept its speed.
+      if (vel || startedAt || checked != null) mutEntry(idx, en => {
+        const set = en.sets[i]
+        if (!set) return
+        if (vel) set.vel = vel
+        if (startedAt) set.startedAt = startedAt
+        if (checked != null) set.checked = checked
+      })
     },
     finish: () => { if (!useStore.getState().S.active?.editingWorkoutId) finishWorkoutNow() },
     discard: () => { if (!useStore.getState().S.active?.editingWorkoutId) discardNow() },

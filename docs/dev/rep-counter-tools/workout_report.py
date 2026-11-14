@@ -71,6 +71,23 @@ def motion_of(a):
     return out
 
 
+def from_detail(meta):
+    """The watch's own per-rep data (`repsDetail`: [start, end, speed or None, source] seconds from
+    Start set), when the set file has it: each counted rep's speed and the loss from it. Loss is
+    unknown ("?") when a rep of the first three has no speed (the speed counter missed it: the
+    best is then not known) or fewer than 4 reps have one; never cut to 0 (negative: faster)."""
+    d = meta.get("repsDetail")
+    if not isinstance(d, list) or not d:
+        return None
+    speeds = [r[2] for r in d if len(r) > 2 and isinstance(r[2], (int, float))]
+    out = {"speeds": speeds, "events": [r[1] for r in d if len(r) > 1]}
+    if len(out["events"]) >= 2:
+        out["tempo"] = float(np.median(np.diff(out["events"])))
+    first_known = all(len(r) > 2 and isinstance(r[2], (int, float)) for r in d[:3])
+    out["loss"] = (1 - float(np.mean(speeds[-2:])) / max(speeds[:3])) if first_known and len(speeds) >= 4 else None
+    return out
+
+
 def bars(speeds):
     """The reps' speeds as small bars, the first ones' best as the full height."""
     if not speeds:
@@ -111,14 +128,18 @@ def readiness(daily, day):
     if not daily:
         return None
     out = {}
+    sl = [v for d, v in sorted(daily.get("sleep") or []) if d == day]
+    sl_before = [v for d, v in sorted(daily.get("sleep") or []) if d < day][-28:]
+    if sl:
+        out["sleep"] = (sl[-1], float(np.median(sl_before)) if len(sl_before) >= 3 else None)
     for key in ("rhr", "hrv"):
         rows = sorted(daily.get(key) or [])
         today = [v for d, v in rows if d == day]
         before = [v for d, v in rows if d < day][-28:]
         if today and len(before) >= 7:
             out[key] = (today[-1], float(np.median(before)))
-    if not out:
-        return None
+    if not ("rhr" in out or "hrv" in out):
+        return {"label": "Not enough days yet", **out} if out else None
     worse = ("rhr" in out and out["rhr"][0] >= out["rhr"][1] + 5) or ("hrv" in out and out["hrv"][0] <= 0.85 * out["hrv"][1])
     better = ("rhr" not in out or out["rhr"][0] <= out["rhr"][1] - 3) and ("hrv" not in out or out["hrv"][0] >= 1.1 * out["hrv"][1])
     out["label"] = "Lower than usual: an easier day may suit you" if worse else ("Better than usual" if better else "Usual")
@@ -133,6 +154,9 @@ def readiness_html(r):
         parts.append(f'resting heart rate {r["rhr"][0]:.0f} bpm (usual {r["rhr"][1]:.0f})')
     if "hrv" in r:
         parts.append(f'HRV {r["hrv"][0]:.0f} ms (usual {r["hrv"][1]:.0f})')
+    if "sleep" in r:
+        u = r["sleep"][1]
+        parts.append(f'sleep {r["sleep"][0]:.1f} h' + (f' (usual {u:.1f})' if u else ''))
     return (f'<h2>Readiness</h2><p><b>{html.escape(r["label"])}</b><br><span class="dim">'
             f'{", ".join(parts)}. From Apple Health, against your last 4 weeks; a rough guide only.</span></p>')
 
@@ -199,7 +223,9 @@ def report(w, workouts, motions, hr_file=None):
     sets.sort()
     nxt = {}
     for (at, ei, si), (nat, nei, nsi) in zip(sets, sets[1:]):
-        start = motions.get((w["id"], w["entries"][nei]["id"], round(nat)), ({}, None))[0].get("start")
+        # when the next set began: its own start from the watch (startedAt), else its file's start
+        nset = w["entries"][nei]["sets"][nsi]
+        start = nset.get("startedAt") or motions.get((w["id"], w["entries"][nei]["id"], round(nat)), ({}, None))[0].get("start")
         nxt[(ei, si)] = ((start or nat) - at) / 1000
 
     rows = []
@@ -212,8 +238,12 @@ def report(w, workouts, motions, hr_file=None):
         rows.append(f'<tr class="ex"><th colspan="8">{html.escape(name_of(e["id"]))}'
                     f'<span class="prev">{html.escape(prev)}</span></th></tr>')
         for si, s in done:
-            meta, a = motions.get((w["id"], e["id"], round(s.get("at") or 0)), ({}, None))
+            meta, a = (motions.get((w["id"], e["id"], "set", si + 1, None))
+                       or motions.get((w["id"], e["id"], round(s.get("at") or 0)), ({}, None)))
             m = motion_of(a)
+            fd = from_detail(meta)
+            if m and fd:  # the watch's own reps and speeds win over the Mac replay
+                m = {**m, **{k: v for k, v in fd.items() if k != "loss"}, "loss": fd["loss"]}
             reps = s.get("r") or 0
             weight = s.get("w") or 0
             total_reps += reps
@@ -222,7 +252,11 @@ def report(w, workouts, motions, hr_file=None):
             watch = f'{counted}' if counted is not None else "–"
             if counted is not None and counted != reps:
                 watch = f'<span class="off">{counted} ({counted - reps:+d})</span>'
-            loss = f'{m["loss"] * 100:.0f}%' if m and "loss" in m else "–"
+            loss = "–" if not m or "loss" not in m else ("?" if m["loss"] is None else f'{m["loss"] * 100:.0f}%')
+            if meta.get("checked") or s.get("checked"):
+                watch += ' <span class="dim" title="reps checked on the watch">✓</span>'
+            rir = s.get("rir")
+            tempo_extra = f'<br><span class="dim">RIR {rir:g}</span>' if rir is not None else ""
             tempo = f'{m["tempo"]:.1f} s' if m and "tempo" in m else "–"
             rec = recovery(meta.get("hrCurve"))
             rec_t = ""
@@ -233,7 +267,7 @@ def report(w, workouts, motions, hr_file=None):
             rest_t = f'{rest / 60:.0f}:{rest % 60:02.0f}' if rest else "–"
             rows.append(
                 f'<tr><td>{si + 1}</td><td>{weight:g}</td><td>{reps:g}</td><td>{watch}</td>'
-                f'<td>{bars(m["speeds"]) if m else ""}</td><td>{loss}</td><td>{tempo}</td>'
+                f'<td>{bars(m["speeds"]) if m else ""}</td><td>{loss}</td><td>{tempo}{tempo_extra}</td>'
                 f'<td>{hr_text(s.get("hr"))}<br><span class="dim">rest {hr_text(s.get("restHr"))} · {rest_t}</span>{rec_t}</td></tr>')
     mins = (w["end"] - w["start"]) / 60000 if w.get("end") and w.get("start") else 0
     day = datetime.fromtimestamp(w["start"] / 1000).strftime("%a %d %b %Y")
@@ -448,6 +482,7 @@ def main():
         workouts = sorted([w for w in s.get("workouts", []) if w.get("start")], key=lambda w: w["start"])
         motions = {}
         hr_files = {}
+        latest = {}
         for f in glob.glob(os.path.join(DATA, "motion", uid, "*.csv")):
             if "_synclog_" in f or "_watchlog_" in f:
                 continue  # the sync logs (lib/sync-log.js, the watch's), read by hand
@@ -458,19 +493,35 @@ def main():
             if meta.get("kind") == "hr":
                 hr_files[meta.get("wid")] = (meta, a)
             elif meta.get("wid") and meta.get("end"):
-                motions[(meta["wid"], meta.get("exId"), round(meta["end"]))] = (meta, a)
+                # one file per set (and side): the set number, not the time, joins it to the
+                # workout, as the phone may move a set's time (edited, ticked again)
+                key = (meta["wid"], meta.get("exId"), meta.get("set"), meta.get("side"))
+                if key in latest and latest[key][0] >= meta["end"]:
+                    continue  # an older file of a set done again: the newer one is the set
+                if key in latest:
+                    motions.pop(latest[key][1], None)
+                k = (meta["wid"], meta.get("exId"), round(meta["end"]))
+                latest[key] = (meta["end"], k)
+                motions[k] = (meta, a)
+        # the same files by set number, for the workout pages (set numbers count from 1)
+        for (wid, ex, sn, side), (_, k) in latest.items():
+            if k in motions and sn is not None:
+                motions[(wid, ex, "set", int(sn), side)] = motions[k]
         dbg = []
         logged = {}
         for w in workouts:
             for e in w["entries"]:
-                for st in e["sets"]:
-                    if st.get("done") and st.get("at"):
-                        logged[(w["id"], e["id"], round(st["at"]))] = st.get("r")
-        for (wid, ex, end), (meta, a) in motions.items():
+                for si, st in enumerate(e["sets"]):
+                    if st.get("done"):
+                        logged[(w["id"], e["id"], si + 1)] = st.get("r")
+        for key, (meta, a) in motions.items():
+            if len(key) != 3:
+                continue  # the same file again, by set number
+            wid, ex, end = key
             # under 3 s: Start then Done at once, nothing to learn from
             if a is None or len(a) < 150 or meta.get("auto") is None:
                 continue
-            lg = logged.get((wid, ex, end))
+            lg = logged.get((wid, ex, meta.get("set")))
             truth = lg if lg is not None else meta.get("reps")
             dbg.append({"start": meta.get("start") or end, "name": name_of(ex), "set": meta.get("set"),
                         "auto": meta.get("auto"), "done": meta.get("reps"), "logged": lg,
