@@ -1191,6 +1191,29 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
     /// ago in red). A skipped rest sets none.
     @Published private(set) var restOverSince: Date?
 
+    /// MyGym heart-rate rest (setting): when the rest's heart rate said ready, and its check.
+    @Published private(set) var hrReadyAt: Date?
+    private var hrRestTimer: Timer?
+    private func watchHRRest() {
+        hrRestTimer?.invalidate()
+        hrRestTimer = nil
+        hrReadyAt = nil
+        guard let drop = state.settings.hrRest, drop > 0, !isDemo else { return }
+        hrRestTimer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] _ in
+            DispatchQueue.main.async { self?.checkHRRest(drop: drop) }
+        }
+    }
+    private func checkHRRest(drop: Double) {
+        guard let from = restStartedAt, restEndsAt != nil, hrReadyAt == nil else { hrRestTimer?.invalidate(); return }
+        let r = health.readings(from: from, to: Date()).map { (t: $0.0.timeIntervalSince(from), bpm: $0.1) }
+        guard HRRest.ready(r, drop: drop) else { return }
+        hrReadyAt = Date()
+        hrRestTimer?.invalidate()
+        let hi = r.filter { $0.t <= HRRest.highWindow }.map { $0.bpm }.max() ?? 0
+        syncLog("hrReady after \(Int(Date().timeIntervalSince(from)))s high \(Int(hi)) now \(Int(r.last?.bpm ?? 0))")
+        for d in [0.0, 0.3] { DispatchQueue.main.asyncAfter(deadline: .now() + d) { WKInterfaceDevice.current().play(.success) } }
+    }
+
     private func startRest(until end: Date, notify: Bool) {
         restOverSince = nil
         restTimer?.invalidate()
@@ -1199,6 +1222,7 @@ final class SessionStore: NSObject, ObservableObject, WCSessionDelegate, UNUserN
         guard end > Date() else { restEndsAt = nil; restStartedAt = nil; return }
         restEndsAt = end
         restStartedAt = Date()
+        watchHRRest()
         restTimer = Timer.scheduledTimer(withTimeInterval: end.timeIntervalSinceNow, repeats: false) { [weak self] _ in
             DispatchQueue.main.async { self?.restOver() }
             DispatchQueue.main.async {

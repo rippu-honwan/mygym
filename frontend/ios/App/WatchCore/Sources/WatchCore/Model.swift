@@ -172,6 +172,8 @@ struct WatchSettings: Codable, Equatable {
     var fatigue: Double?
     /// MyGym: a set ends by itself when the wrist is still for a few seconds after a rep.
     var autoEnd: Bool?
+    /// MyGym: the rest says ready once the heart rate fell this many bpm and levelled (0/nil: off).
+    var hrRest: Double?
 }
 
 /// What a workout screen shows. Each nil means its default.

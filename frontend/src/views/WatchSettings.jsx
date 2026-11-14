@@ -89,10 +89,13 @@ export default function WatchSettingsPage() {
         </Row>
       </Section>
       {/* MyGym: the rep counter's choices (docs/dev/rep-counter.md). */}
-      <Section title="Rep counter" footer="Both work from Start set to Done. Fatigue alert: two taps when your reps slow down this much against the first ones. Auto-end: after a rep, keep the wrist still for 4 seconds; an orange ring counts 3 more, a tap keeps the set going.">
+      <Section title="Rep counter" footer="Fatigue alert: two taps when two reps in a row are this much slower than your first ones. Auto-end: once half the reps are counted, keep the wrist still for 2 seconds; an orange ring counts 2 more, a new rep or a tap keeps the set going. Heart rate rest: from 45 seconds on, once your heart rate is this far under its high after the set and has levelled off, the rest turns green and the watch taps twice; the rest timer still runs.">
         <SelectRow icon="vibrate" iconTint="var(--orange)" title="Fatigue alert" value={String(prefs.fatigue)}
           onChange={v => set({ fatigue: Number(v) })}
           options={[{ value: '0', label: 'Off' }, { value: '0.2', label: '20% slower' }, { value: '0.3', label: '30% slower' }, { value: '0.4', label: '40% slower' }]} />
+        <SelectRow icon="heart" iconTint="var(--red)" title="Heart rate rest" value={String(prefs.hrRest)}
+          onChange={v => set({ hrRest: Number(v) })}
+          options={[{ value: '0', label: 'Off' }, { value: '10', label: '10 bpm down' }, { value: '15', label: '15 bpm down' }, { value: '20', label: '20 bpm down' }]} />
         <Row icon="timer" iconTint="var(--green)" title="End a set when the wrist is still">
           <Switch checked={prefs.autoEnd} onChange={v => set({ autoEnd: v })} aria-label="End a set when the wrist is still" />
         </Row>

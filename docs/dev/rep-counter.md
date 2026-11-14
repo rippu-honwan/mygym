@@ -919,3 +919,16 @@ Still far from 80 % exact. Ceiling seen offline (trimming after the set ends): 6
 the hand-checked sets. Next levers: per-exercise choice of counter (needs more sets per
 exercise), the user's RIR and checked sets as they add up. The report's "Watch" column and the
 debug page's Mac replay now use v3.
+
+## Heart-rate rest, step 2: the ready signal (2026-11-14 evening)
+
+Data: 36 rests of 13-14 Nov with `hrCurve` (peaks after a set 102-155 bpm; the user rests a median
+129 s against a 90 s timer; by the next Start the heart rate had fallen a median 12.5 bpm).
+Replayed rules (min 45 s): drop 10 -> ready in 30/36 (median 48 s); drop 15 -> 23/36 (54 s);
+drop 20 -> 15/36 (62 s); drop 10 AND levelled (moved <= 3 bpm over 20 s) -> 23/36 (62 s).
+Built (`HRRest.ready`, WatchCore SetSpeed.swift, 91 tests): from 45 s into the rest, the heart rate
+the setting's bpm under its high of the first 40 s AND levelled. Then two `.success` taps, the rest
+ring turns mint and says "Ready"; the rest timer still runs and ends as before (max = timer).
+Checked every 3 s during a rest (`SessionStore.watchHRRest`); logged as `hrReady` in the watch's
+sync log. Phone: Settings > Apple Watch > Rep counter > "Heart rate rest": Off / 10 / 15 / 20 bpm
+down (`hrRest`, off by default). Not tried on the devices yet.

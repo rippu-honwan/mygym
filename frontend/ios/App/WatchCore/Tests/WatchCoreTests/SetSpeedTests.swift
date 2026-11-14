@@ -39,4 +39,15 @@ final class SetSpeedTests: XCTestCase {
         XCTAssertFalse(g.admit(7.9), "under a third of the usual 3 s")
         XCTAssertTrue(g.admit(10.2))
     }
+
+    func testHRRest() {
+        // high 130 after the set, down to 116 by 40 s, then flat
+        var r: [(t: Double, bpm: Double)] = [(0, 125), (5, 130), (15, 126), (25, 121), (35, 117), (45, 116), (55, 116), (65, 115)]
+        XCTAssertTrue(HRRest.ready(r, drop: 10))
+        XCTAssertFalse(HRRest.ready(r, drop: 20), "never 20 under the high")
+        XCTAssertFalse(HRRest.ready(Array(r.prefix(5)), drop: 10), "before 45 s")
+        r.append((75, 109))
+        XCTAssertFalse(HRRest.ready(r, drop: 10), "still falling fast: not levelled")
+        XCTAssertFalse(HRRest.ready(r, drop: 0), "off")
+    }
 }

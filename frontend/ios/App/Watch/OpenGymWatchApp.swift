@@ -1229,10 +1229,16 @@ struct RestView: View {
         VStack(spacing: 2) {
             ZStack {
                 if store.show.restRing {
-                    CountdownRing(start: store.restStartedAt ?? end.addingTimeInterval(-90), end: end)
+                    CountdownRing(start: store.restStartedAt ?? end.addingTimeInterval(-90), end: end,
+                                  color: store.hrReadyAt == nil ? Theme.accent : .mint)
                 }
                 VStack(spacing: 1) {
-                    Text("Rest").font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
+                    // MyGym: the heart rate says ready (setting): the rest can end here
+                    if store.hrReadyAt != nil {
+                        Text(verbatim: "Ready").font(.caption2.weight(.bold)).foregroundStyle(.mint)
+                    } else {
+                        Text("Rest").font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
+                    }
                     Text(timerInterval: min(Date(), end)...end, countsDown: true)
                         .font(.system(size: store.show.restRing ? countdownSize : countdownSize * 1.35, weight: .semibold, design: .rounded).monospacedDigit())
                         .minimumScaleFactor(0.5)

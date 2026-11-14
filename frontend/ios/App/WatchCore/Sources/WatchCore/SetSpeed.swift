@@ -67,3 +67,21 @@ struct RepGate {
         return true
     }
 }
+
+/// MyGym: the rest is long enough by heart rate. From the readings since the rest began
+/// ([seconds since then, bpm]): at least `minRest` s in, the heart rate `drop` bpm or more under
+/// its high of the first 40 s, and levelled off (it moved no more than 3 bpm over the last 20 s:
+/// the quick part of the recovery is over). Replayed on 36 rests of 13-14 Nov (peaks 102-155 bpm):
+/// a 10 bpm drop said ready in 23, a median 62 s in; a plain drop of 15 in 23, 54 s.
+enum HRRest {
+    static let minRest = 45.0, highWindow = 40.0, levelWindow = 20.0, levelTolerance = 3.0
+
+    static func ready(_ readings: [(t: Double, bpm: Double)], drop: Double) -> Bool {
+        guard drop > 0, let now = readings.last, now.t >= minRest else { return false }
+        guard let high = readings.filter({ $0.t <= highWindow }).map({ $0.bpm }).max(), now.bpm <= high - drop else { return false }
+        let recent = readings.filter { $0.t >= now.t - levelWindow }.map { $0.bpm }
+        guard let first = readings.first, now.t - first.t >= levelWindow, recent.count >= 2,
+              let hi = recent.max(), let lo = recent.min() else { return false }
+        return hi - lo <= levelTolerance
+    }
+}
